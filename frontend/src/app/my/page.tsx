@@ -83,9 +83,10 @@ export default function MyPage() {
       const tickets: Ticket[] = [];
 
       for (const event of events) {
-        const tokenId = event.args?.ticketId;
-        const drawId = event.args?.drawId;
-        const numbers = event.args?.numbers;
+        const eventLog = event as any; // TypeScript 타입 오류 회피
+        const tokenId = eventLog.args?.ticketId;
+        const drawId = eventLog.args?.drawId;
+        const numbers = eventLog.args?.numbers;
 
         console.log(`🔍 처리 중 - 티켓ID: ${tokenId}, 회차: ${drawId}`);
 

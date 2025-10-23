@@ -68,14 +68,15 @@ export default function ResultPage() {
       const distributions: PrizeDistribution[] = [];
 
       for (const event of events) {
-        const drawId = event.args?.drawId;
-        const firstWinners = event.args?.firstWinners;
-        const secondWinners = event.args?.secondWinners;
-        const thirdWinners = event.args?.thirdWinners;
-        const firstPrize = event.args?.firstPrize;
-        const secondPrize = event.args?.secondPrize;
-        const thirdPrize = event.args?.thirdPrize;
-        const rolloverAmount = event.args?.rolloverAmount;
+        const eventLog = event as any; // TypeScript 타입 오류 회피
+        const drawId = eventLog.args?.drawId;
+        const firstWinners = eventLog.args?.firstWinners;
+        const secondWinners = eventLog.args?.secondWinners;
+        const thirdWinners = eventLog.args?.thirdWinners;
+        const firstPrize = eventLog.args?.firstPrize;
+        const secondPrize = eventLog.args?.secondPrize;
+        const thirdPrize = eventLog.args?.thirdPrize;
+        const rolloverAmount = eventLog.args?.rolloverAmount;
 
         distributions.push({
           drawId: Number(drawId),
