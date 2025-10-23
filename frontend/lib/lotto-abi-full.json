@@ -1,113 +1,1128 @@
-
-╭-------------+-------------------------------------------------------------------+--------------------------------------------------------------------╮
-| Type        | Signature                                                         | Selector                                                           |
-+======================================================================================================================================================+
-| event       | Approval(address,address,uint256)                                 | 0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925 |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | ApprovalForAll(address,address,bool)                              | 0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31 |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | BatchMetadataUpdate(uint256,uint256)                              | 0x6bd5c950a8d8df17f772f5af37cb3655737899cbf903264b9795592da439661c |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | DrawCreated(uint256,uint256)                                      | 0x9e5aa1895cac644f584979428802a3ac9d38f05cfc30e374b4f236cf36fb1009 |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | MetadataUpdate(uint256)                                           | 0xf8e1a15aba9398e019f0b49df1a4fde98ee17ae345cb5f6b5e2c27f5033e8ce7 |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | OwnershipTransferred(address,address)                             | 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0 |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | PrizesDistributed(uint256,uint256,uint256)                        | 0xa31a8a5a68ca350cb33920042bb6978feb068a0c0ffaf4b04449a9adb2a2fbb7 |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | RandomWordsRequested(uint256,uint256)                             | 0xc904ef81354df41ed9256aa2ab862017f6ab3f33f3f7ca50016a1786083d086d |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | TicketPurchased(address,uint256,uint256,uint8[6])                 | 0xacadae367eafc03f8dc8de4d900a78d3d610a8f575c6b8403d8d83bbddd2d1c0 |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | Transfer(address,address,uint256)                                 | 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | WinningNumbersSet(uint256,uint8[6])                               | 0x3477b03ea3299585613fdd5a467fb91f5ad046a9ae55e05687a3efb8d9966c50 |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC721IncorrectOwner(address,uint256,address)                     | 0x64283d7b                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC721InsufficientApproval(address,uint256)                       | 0x177e802f                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC721InvalidApprover(address)                                    | 0xa9fbf51f                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC721InvalidOperator(address)                                    | 0x5b08ba18                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC721InvalidOwner(address)                                       | 0x89c62b64                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC721InvalidReceiver(address)                                    | 0x64a0ae92                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC721InvalidSender(address)                                      | 0x73c6ac6e                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC721NonexistentToken(uint256)                                   | 0x7e273289                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | OwnableInvalidOwner(address)                                      | 0x1e4fbdf7                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | OwnableUnauthorizedAccount(address)                               | 0x118cdaa7                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | approve(address,uint256) nonpayable                               | 0x095ea7b3                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | balanceOf(address) view returns (uint256)                         | 0x70a08231                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | buyTicket(uint8[6],string) payable                                | 0xe2d5aea2                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | createOrUpdateDraw(uint256,uint256,bool) nonpayable               | 0xfa52049e                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | currentDrawId() view returns (uint256)                            | 0xbca78fab                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | draws(uint256) view returns (uint256,bool)                        | 0x0cc36c36                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | fulfillRandomWords(uint256,uint256[]) nonpayable                  | 0x38ba4614                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | getApproved(uint256) view returns (address)                       | 0x081812fc                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | isApprovedForAll(address,address) view returns (bool)             | 0xe985e9c5                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | name() view returns (string)                                      | 0x06fdde03                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | nextTicketId() view returns (uint256)                             | 0x6031a52f                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | owner() view returns (address)                                    | 0x8da5cb5b                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | ownerOf(uint256) view returns (address)                           | 0x6352211e                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | prizePool(uint256) view returns (uint256)                         | 0xd636e6fa                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | purchaseTimestamps(uint256) view returns (uint256)                | 0x7323c551                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | renounceOwnership() nonpayable                                    | 0x715018a6                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | requestIdToDrawId(uint256) view returns (uint256)                 | 0x8ebc5636                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | requestRandomWinningNumbers(uint256) nonpayable returns (uint256) | 0x0c7c1d0b                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | safeTransferFrom(address,address,uint256) nonpayable              | 0x42842e0e                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | safeTransferFrom(address,address,uint256,bytes) nonpayable        | 0xb88d4fde                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | setApprovalForAll(address,bool) nonpayable                        | 0xa22cb465                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | setCurrentDraw(uint256) nonpayable                                | 0xc35ab62b                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | supportsInterface(bytes4) view returns (bool)                     | 0x01ffc9a7                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | symbol() view returns (string)                                    | 0x95d89b41                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | ticketNumbers(uint256,uint256) view returns (uint8)               | 0xb217be05                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | ticketPrice() view returns (uint256)                              | 0x1209b1f6                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | ticketToDraw(uint256) view returns (uint256)                      | 0xc6580429                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | tokenURI(uint256) view returns (string)                           | 0xc87b56dd                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | transferFrom(address,address,uint256) nonpayable                  | 0x23b872dd                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | transferOwnership(address) nonpayable                             | 0xf2fde38b                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | winningNumbers(uint256,uint256) view returns (uint8)              | 0xf98d487f                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | withdraw() nonpayable                                             | 0x3ccfd60b                                                         |
-|-------------+-------------------------------------------------------------------+--------------------------------------------------------------------|
-| constructor | constructor(address,uint64,bytes32) nonpayable                    |                                                                    |
-╰-------------+-------------------------------------------------------------------+--------------------------------------------------------------------╯
-
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "vrfCoordinator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "accId",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "keyHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "accumulatedJackpot",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "approve",
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "balanceOf",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "buyTicket",
+    "inputs": [
+      {
+        "name": "_numbers",
+        "type": "uint8[6]",
+        "internalType": "uint8[6]"
+      },
+      {
+        "name": "_tokenURI",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "buyTicketBatch",
+    "inputs": [
+      {
+        "name": "_numbersArray",
+        "type": "uint8[6][]",
+        "internalType": "uint8[6][]"
+      },
+      {
+        "name": "_tokenURIs",
+        "type": "string[]",
+        "internalType": "string[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "collectedFees",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createOrUpdateDraw",
+    "inputs": [
+      {
+        "name": "_drawId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_drawTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_isOpenForSale",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "currentDrawId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "draws",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "drawTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "isOpenForSale",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "emergencyWithdraw",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "finishCurrentAndStartNext",
+    "inputs": [
+      {
+        "name": "_nextDrawTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "fulfillRandomWords",
+    "inputs": [
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "randomWords",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getApproved",
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isApprovedForAll",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "name",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nextTicketId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "owner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ownerOf",
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "prizePool",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "purchaseTimestamps",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "renounceOwnership",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "requestIdToDrawId",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "requestRandomWinningNumbers",
+    "inputs": [
+      {
+        "name": "_drawId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "resetDrawSystem",
+    "inputs": [
+      {
+        "name": "_newDrawId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_drawTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "safeTransferFrom",
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "safeTransferFrom",
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setApprovalForAll",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "approved",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setCurrentDraw",
+    "inputs": [
+      {
+        "name": "_drawId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setTicketPrice",
+    "inputs": [
+      {
+        "name": "newPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setWinningNumbersForTest",
+    "inputs": [
+      {
+        "name": "_drawId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_numbers",
+        "type": "uint8[6]",
+        "internalType": "uint8[6]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "supportsInterface",
+    "inputs": [
+      {
+        "name": "interfaceId",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "symbol",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ticketNumbers",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ticketPrice",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ticketToDraw",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "tokenURI",
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "transferFrom",
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "transferOwnership",
+    "inputs": [
+      {
+        "name": "newOwner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "winningNumbers",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "withdrawFees",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "Approval",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "approved",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ApprovalForAll",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "approved",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BatchMetadataUpdate",
+    "inputs": [
+      {
+        "name": "_fromTokenId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "_toTokenId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DrawCreated",
+    "inputs": [
+      {
+        "name": "drawId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "drawTimestamp",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "JackpotRollover",
+    "inputs": [
+      {
+        "name": "fromDrawId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "toDrawId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MetadataUpdate",
+    "inputs": [
+      {
+        "name": "_tokenId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OwnershipTransferred",
+    "inputs": [
+      {
+        "name": "previousOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PrizesDistributed",
+    "inputs": [
+      {
+        "name": "drawId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "firstWinners",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "secondWinners",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "thirdWinners",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "firstPrize",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "secondPrize",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "thirdPrize",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "rolloverAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RandomWordsRequested",
+    "inputs": [
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "drawId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TicketPurchased",
+    "inputs": [
+      {
+        "name": "buyer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "ticketId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "drawId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "numbers",
+        "type": "uint8[6]",
+        "indexed": false,
+        "internalType": "uint8[6]"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Transfer",
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "WinningNumbersSet",
+    "inputs": [
+      {
+        "name": "drawId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "numbers",
+        "type": "uint8[6]",
+        "indexed": false,
+        "internalType": "uint8[6]"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "ERC721IncorrectOwner",
+    "inputs": [
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InsufficientApproval",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidApprover",
+    "inputs": [
+      {
+        "name": "approver",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidOperator",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidOwner",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidReceiver",
+    "inputs": [
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidSender",
+    "inputs": [
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC721NonexistentToken",
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OwnableInvalidOwner",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OwnableUnauthorizedAccount",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  }
+]

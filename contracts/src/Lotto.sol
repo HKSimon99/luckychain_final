@@ -107,6 +107,58 @@ contract Lotto is ERC721URIStorage, Ownable {
         emit TicketPurchased(msg.sender, tokenId, currentDrawId, _numbers);
     }
 
+    // --- 🎫 [배치 구매 함수 - 여러 장을 한 번에!] ---
+    /**
+     * @notice 여러 티켓을 한 번에 구매 (최대 50장)
+     * @param _numbersArray 각 티켓의 번호 배열
+     * @param _tokenURIs 각 티켓의 URI 배열
+     * @dev 가스비를 대폭 절감하고 한 번의 트랜잭션으로 여러 장 구매 가능
+     */
+    function buyTicketBatch(
+        uint8[6][] calldata _numbersArray,
+        string[] calldata _tokenURIs
+    ) external payable {
+        uint256 batchSize = _numbersArray.length;
+        
+        // 유효성 검사
+        require(batchSize > 0 && batchSize <= 50, "Lotto: Batch size must be 1-50");
+        require(batchSize == _tokenURIs.length, "Lotto: Array length mismatch");
+        require(draws[currentDrawId].isOpenForSale, "Current draw is not open for sale");
+        require(msg.value == ticketPrice * batchSize, "Lotto: Incorrect payment amount");
+        
+        // 총 수익 계산
+        uint256 totalPayment = msg.value;
+        uint256 totalFee = (totalPayment * 20) / 100;      // 20% 수수료
+        uint256 totalPrize = totalPayment - totalFee;      // 80% 상금 풀
+        
+        // 상태 업데이트 (한 번만)
+        collectedFees += totalFee;
+        prizePool[currentDrawId] += totalPrize;
+        
+        // 각 티켓 발행
+        for (uint256 i = 0; i < batchSize; i++) {
+            // 번호 유효성 검사
+            _validateNumbers(_numbersArray[i]);
+            
+            uint256 tokenId = nextTicketId;
+            
+            // 티켓 정보 저장
+            ticketNumbers[tokenId] = _numbersArray[i];
+            purchaseTimestamps[tokenId] = block.timestamp;
+            ticketToDraw[tokenId] = currentDrawId;
+            _drawIdToTicketIds[currentDrawId].push(tokenId);
+            
+            // NFT 발행
+            _safeMint(msg.sender, tokenId);
+            _setTokenURI(tokenId, _tokenURIs[i]);
+            
+            nextTicketId++;
+            
+            // 이벤트 발행
+            emit TicketPurchased(msg.sender, tokenId, currentDrawId, _numbersArray[i]);
+        }
+    }
+
     // --- 🔎 [입력 번호 유효성 검증] ---
     function _validateNumbers(uint8[6] memory numbers) internal pure {
         // 각 번호는 1~45 사이, 중복 금지
@@ -130,6 +182,53 @@ contract Lotto is ERC721URIStorage, Ownable {
 
     function setCurrentDraw(uint256 _drawId) external onlyOwner {
         currentDrawId = _drawId;
+    }
+
+    // --- 🔄 [회차 종료 및 다음 회차 시작 - 자동화] ---
+    /**
+     * @notice 현재 회차를 종료하고 다음 회차를 자동으로 시작합니다.
+     * @param _nextDrawTimestamp 다음 회차의 추첨 날짜 (timestamp)
+     * @dev 현재 회차 판매를 중단하고, 다음 회차를 생성 및 활성화합니다.
+     */
+    function finishCurrentAndStartNext(uint256 _nextDrawTimestamp) external onlyOwner {
+        // 1. 현재 회차 판매 종료
+        if (currentDrawId > 0) {
+            draws[currentDrawId].isOpenForSale = false;
+        }
+        
+        // 2. 다음 회차 ID
+        uint256 nextDrawId = currentDrawId + 1;
+        
+        // 3. 다음 회차 생성 (판매 시작)
+        draws[nextDrawId] = Draw({
+            drawTimestamp: _nextDrawTimestamp,
+            isOpenForSale: true
+        });
+        
+        // 4. 현재 판매 회차를 다음 회차로 설정
+        currentDrawId = nextDrawId;
+        
+        emit DrawCreated(nextDrawId, _nextDrawTimestamp);
+    }
+
+    // --- 🔧 [회차 리셋 - 긴급용] ---
+    /**
+     * @notice 회차 시스템을 완전히 리셋합니다 (긴급 상황용)
+     * @param _newDrawId 새로운 시작 회차 ID (보통 1)
+     * @param _drawTimestamp 추첨 날짜
+     * @dev 주의: 이전 회차 데이터는 유지되지만 currentDrawId가 변경됩니다.
+     */
+    function resetDrawSystem(uint256 _newDrawId, uint256 _drawTimestamp) external onlyOwner {
+        // 새 회차 생성
+        draws[_newDrawId] = Draw({
+            drawTimestamp: _drawTimestamp,
+            isOpenForSale: true
+        });
+        
+        // 현재 회차 설정
+        currentDrawId = _newDrawId;
+        
+        emit DrawCreated(_newDrawId, _drawTimestamp);
     }
 
     // --- 🎲 [난수 요청 함수 추가] 🎲 ---
@@ -368,6 +467,14 @@ contract Lotto is ERC721URIStorage, Ownable {
         // 긴급 상황에서만 사용: 모든 잔액 인출
         (bool success, ) = owner().call{value: address(this).balance}("");
         require(success, "Lotto: Emergency withdrawal failed");
+    }
+
+    // --- 💰 [티켓 가격 변경 함수] ---
+    /// @notice 관리자가 티켓 가격을 변경합니다
+    /// @param newPrice 새로운 티켓 가격 (wei 단위)
+    function setTicketPrice(uint256 newPrice) external onlyOwner {
+        require(newPrice > 0, "Lotto: Price must be greater than 0");
+        ticketPrice = newPrice;
     }
 
     // --- 🧪 [테스트 전용 함수 - 배포 전 삭제 필수!] ---
