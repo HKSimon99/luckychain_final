@@ -13,8 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kiwoom Lottery - 블록체인 로또",
-  description: "Chainlink VRF를 활용한 탈중앙화 로또 시스템",
+  title: "Luckychain - 블록체인 로또",
+  description: "Orakl VRF를 활용한 탈중앙화 로또 시스템",
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
 };
 
 export default function RootLayout({

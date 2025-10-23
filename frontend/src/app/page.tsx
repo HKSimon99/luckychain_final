@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ethers } from 'ethers';
+import Image from 'next/image';
 import * as lottoAbiModule from '../../lib/lottoAbi.json';
 import MobileLayout from '@/components/MobileLayout';
 
@@ -19,12 +20,24 @@ export default function HomePage() {
   const [prizePool, setPrizePool] = useState('0');
   const [accumulatedJackpot, setAccumulatedJackpot] = useState('0');
   const [ticketCount, setTicketCount] = useState(0);
+  const [isFirstVisit, setIsFirstVisit] = useState(true);
 
   // 타이머 상태
   const [days, setDays] = useState(2);
   const [hours, setHours] = useState(18);
   const [minutes, setMinutes] = useState(54);
   const [seconds, setSeconds] = useState(13);
+
+  // 앱 시작 시 항상 스플래시 화면 표시
+  useEffect(() => {
+    const hasSeenSplash = sessionStorage.getItem('hasSeenSplash');
+    if (!hasSeenSplash) {
+      sessionStorage.setItem('hasSeenSplash', 'true');
+      router.push('/splash');
+    } else {
+      setIsFirstVisit(false);
+    }
+  }, [router]);
 
   // 컨트랙트 초기화
   useEffect(() => {
@@ -49,14 +62,11 @@ export default function HomePage() {
           const filter = contract.filters.TicketPurchased();
           const events = await contract.queryFilter(filter, fromBlock, 'latest');
           
-          tickets = events.filter((event: any) => 
-            Number(event.args.drawId) === Number(currentDraw)
-          ).length;
-          
-          console.log(`✅ 티켓 수 조회 완료: ${tickets}장 (블록 ${fromBlock} ~ ${currentBlock})`);
-        } catch (error) {
-          console.error('티켓 수 조회 실패 (기본값 0 사용):', error);
-          tickets = 0;
+          tickets = events.filter((event: any) => {
+            return Number(event.args?.drawId) === Number(currentDraw);
+          }).length;
+        } catch (e) {
+          console.log('티켓 수 조회 실패 (이벤트):', e);
         }
 
         setCurrentDrawId(Number(currentDraw));
@@ -64,25 +74,23 @@ export default function HomePage() {
         setPrizePool(ethers.formatEther(pool));
         setAccumulatedJackpot(ethers.formatEther(jackpot));
         setTicketCount(tickets);
-
-        console.log('✅ 컨트랙트 데이터 로드 완료');
       } catch (error) {
-        console.error('❌ 컨트랙트 연결 실패:', error);
+        console.error('초기화 실패:', error);
       }
     };
 
     initContract();
   }, []);
 
-  // 타이머 (더미 - 실제로는 컨트랙트에서 시간 가져와야 함)
+  // 타이머 카운트다운
   useEffect(() => {
     const timer = setInterval(() => {
-      setSeconds((s) => {
-        if (s > 0) return s - 1;
-        setMinutes((m) => {
-          if (m > 0) return m - 1;
-          setHours((h) => {
-            if (h > 0) return h - 1;
+      setSeconds((prev) => {
+        if (prev > 0) return prev - 1;
+        setMinutes((min) => {
+          if (min > 0) return min - 1;
+          setHours((hr) => {
+            if (hr > 0) return hr - 1;
             setDays((d) => (d > 0 ? d - 1 : 0));
             return 23;
           });
@@ -94,9 +102,17 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, []);
 
-  // 총 상금 계산
-  const totalPrize = (parseFloat(prizePool) + parseFloat(accumulatedJackpot)).toFixed(4);
-  const totalPrizeKRW = (parseFloat(totalPrize) * 1430).toFixed(0);
+  // 총 상금 계산 (prizePool + accumulatedJackpot)
+  const totalPrize = (parseFloat(prizePool) + parseFloat(accumulatedJackpot)).toFixed(0);
+  const totalPrizeKRW = (parseFloat(totalPrize) * 1430).toLocaleString();
+
+  // 현재 회차 금액 (이월 금액 제외, prizePool만)
+  const currentDrawPrize = parseFloat(prizePool).toFixed(2);
+
+  // 첫 방문 시 리디렉션 중이면 아무것도 렌더링하지 않음
+  if (isFirstVisit) {
+    return null;
+  }
 
   return (
     <MobileLayout>
@@ -104,44 +120,46 @@ export default function HomePage() {
       <div
         style={{
           background: 'white',
-          padding: 'clamp(12px, 3vw, 15px) clamp(15px, 4vw, 20px)',
+          padding: 'clamp(10px, 2.5vw, 12px) clamp(15px, 4vw, 18px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          borderBottom: '1px solid #380D44',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 10px)' }}>
           {/* 로고 */}
-          <svg width="clamp(30px, 8vw, 40px)" height="clamp(30px, 8vw, 40px)" viewBox="0 0 40 40" fill="none">
-            <circle cx="20" cy="14" r="6" fill="#4A9B8E" />
-            <circle cx="14" cy="20" r="6" fill="#4A9B8E" />
-            <circle cx="26" cy="20" r="6" fill="#4A9B8E" />
-            <circle cx="20" cy="26" r="6" fill="#4A9B8E" />
-            <ellipse cx="24" cy="18" rx="4" ry="7" fill="none" stroke="#F4D98B" strokeWidth="2" transform="rotate(45 24 18)" />
-            <ellipse cx="22" cy="22" rx="4" ry="7" fill="none" stroke="#F4D98B" strokeWidth="2" transform="rotate(45 22 22)" />
-          </svg>
+          <div style={{ width: 'clamp(32px, 8vw, 37px)', height: 'clamp(32px, 8vw, 37px)', position: 'relative' }}>
+            <Image
+              src="/logo.png"
+              alt="Luckychain Logo"
+              width={37}
+              height={37}
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              priority
+            />
+          </div>
           <span
             style={{
-              fontSize: 'clamp(16px, 4vw, 20px)',
-              fontWeight: '600',
-              color: '#333',
+              fontSize: 'clamp(13px, 3.5vw, 15px)',
+              fontWeight: '200',
+              color: '#000',
               fontFamily: 'SF Pro, Arial, sans-serif',
+              letterSpacing: '-0.5px',
             }}
           >
             Luckychain
           </span>
         </div>
 
-        {/* 햄버거 메뉴 (관리자 페이지로 이동) */}
+        {/* 햄버거 메뉴 */}
         <div
           onClick={() => router.push('/admin')}
-          style={{ cursor: 'pointer', opacity: 0.3 }}
+          style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 'clamp(4px, 1vw, 5px)' }}
         >
-          <svg width="clamp(24px, 6vw, 30px)" height="clamp(24px, 6vw, 30px)" viewBox="0 0 30 30">
-            <rect y="7" width="30" height="3" fill="#333" rx="1.5" />
-            <rect y="14" width="30" height="3" fill="#333" rx="1.5" />
-            <rect y="21" width="30" height="3" fill="#333" rx="1.5" />
-          </svg>
+          <div style={{ width: 'clamp(20px, 5vw, 24px)', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
+          <div style={{ width: 'clamp(20px, 5vw, 24px)', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
+          <div style={{ width: 'clamp(20px, 5vw, 24px)', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
         </div>
       </div>
 
@@ -149,452 +167,262 @@ export default function HomePage() {
       <div
         style={{
           flex: 1,
-          padding: 'clamp(20px, 5vw, 30px) clamp(15px, 4vw, 20px) clamp(120px, 20vh, 150px)',
           overflow: 'auto',
+          paddingBottom: 'clamp(80px, 15vh, 100px)',
         }}
       >
-        {/* 타이틀 */}
-        <div style={{ textAlign: 'center', marginBottom: 'clamp(20px, 5vw, 30px)' }}>
-          <h1
-            style={{
-              fontSize: 'clamp(20px, 5vw, 24px)',
-              fontWeight: '700',
-              color: 'white',
-              marginBottom: 'clamp(15px, 4vw, 20px)',
-              lineHeight: '1.4',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            지금 참여하고
-            <br />
-            당첨의 주인공이 되세요!
-          </h1>
-
-          {/* 상금 카드 */}
-          <div
-            style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '2px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: 'clamp(15px, 4vw, 20px)',
-              padding: 'clamp(20px, 5vw, 25px)',
-              marginBottom: 'clamp(8px, 2vw, 10px)',
-            }}
-          >
-            {/* 헤더 */}
-            <div
-              style={{
-                fontSize: 'clamp(14px, 3.5vw, 16px)',
-                color: 'white',
-                marginBottom: 'clamp(12px, 3vw, 15px)',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-                textAlign: 'center',
-              }}
-            >
-              현재 회차 #{currentDrawId} 총 상금
-            </div>
-
-            {/* 총 상금 */}
-            <div
-              style={{
-                textAlign: 'center',
-                marginBottom: 'clamp(15px, 4vw, 20px)',
-                paddingBottom: 'clamp(12px, 3vw, 15px)',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 'clamp(32px, 8vw, 42px)',
-                  fontWeight: '700',
-                  color: '#93EE00',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                  marginBottom: 'clamp(4px, 1vw, 5px)',
-                }}
-              >
-                {totalPrize} KAIA
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                ₩ {parseInt(totalPrizeKRW).toLocaleString()}원
-              </div>
-            </div>
-
-            {/* 상금 구성 */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'clamp(10px, 3vw, 12px)' }}>
-              {/* 현재 회차 */}
-              <div
-                style={{
-                  flex: 1,
-                  background: 'rgba(147, 238, 0, 0.15)',
-                  borderRadius: 'clamp(10px, 3vw, 12px)',
-                  padding: 'clamp(10px, 3vw, 12px)',
-                  border: '1px solid rgba(147, 238, 0, 0.3)',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 'clamp(9px, 2.5vw, 11px)',
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    marginBottom: 'clamp(5px, 1.5vw, 6px)',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                    textAlign: 'center',
-                  }}
-                >
-                  💰 현재 회차
-                </div>
-                <div
-                  style={{
-                    fontSize: 'clamp(14px, 4vw, 16px)',
-                    fontWeight: '700',
-                    color: '#93EE00',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                    textAlign: 'center',
-                  }}
-                >
-                  {parseFloat(prizePool).toFixed(2)}
-                </div>
-                <div
-                  style={{
-                    fontSize: 'clamp(8px, 2vw, 9px)',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    marginTop: 'clamp(3px, 1vw, 4px)',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                    textAlign: 'center',
-                  }}
-                >
-                  KAIA
-                </div>
-              </div>
-
-              {/* 누적 잭팟 */}
-              <div
-                style={{
-                  flex: 1,
-                  background: 'rgba(255, 193, 7, 0.15)',
-                  borderRadius: 'clamp(10px, 3vw, 12px)',
-                  padding: 'clamp(10px, 3vw, 12px)',
-                  border: '1px solid rgba(255, 193, 7, 0.3)',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 'clamp(9px, 2.5vw, 11px)',
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    marginBottom: 'clamp(5px, 1.5vw, 6px)',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                    textAlign: 'center',
-                  }}
-                >
-                  🔥 누적 잭팟
-                </div>
-                <div
-                  style={{
-                    fontSize: 'clamp(14px, 4vw, 16px)',
-                    fontWeight: '700',
-                    color: '#FFC107',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                    textAlign: 'center',
-                  }}
-                >
-                  {parseFloat(accumulatedJackpot).toFixed(2)}
-                </div>
-                <div
-                  style={{
-                    fontSize: 'clamp(8px, 2vw, 9px)',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    marginTop: 'clamp(3px, 1vw, 4px)',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                    textAlign: 'center',
-                  }}
-                >
-                  KAIA
-                </div>
-              </div>
-            </div>
-
-            {/* 참여자 수 */}
-            {ticketCount > 0 && (
-              <div
-                style={{
-                  marginTop: 'clamp(10px, 3vw, 12px)',
-                  textAlign: 'center',
-                  fontSize: 'clamp(9px, 2.5vw, 11px)',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                👥 {ticketCount}명 참여 중
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 타이머 */}
+        {/* 타이머 카드 */}
         <div
           style={{
-            background: 'white',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(20px, 5vw, 25px)',
-            marginBottom: 'clamp(20px, 5vw, 30px)',
+            padding: 'clamp(15px, 4vw, 20px)',
+            paddingTop: 'clamp(25px, 6vw, 35px)',
           }}
         >
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'clamp(8px, 2vw, 10px)',
-              marginBottom: 'clamp(12px, 3vw, 15px)',
-              color: '#666',
-              fontSize: 'clamp(14px, 3.5vw, 16px)',
-              fontFamily: 'SF Pro, Arial, sans-serif',
+              background: '#FFFFFF',
+              borderRadius: 'clamp(8px, 2vw, 10px)',
+              padding: 'clamp(18px, 4.5vw, 22px)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             }}
           >
-            <span>⏰</span>
-            <span>다음 추첨까지</span>
-          </div>
+            {/* 타이틀 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 10px)', marginBottom: 'clamp(18px, 4.5vw, 22px)' }}>
+              <svg width="clamp(20px, 5vw, 24px)" height="clamp(20px, 5vw, 24px)" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="#5E5E5E" strokeWidth="2" />
+                <path d="M12 7V12L15 14" stroke="#5E5E5E" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <span style={{ fontSize: 'clamp(12px, 3vw, 14px)', color: '#000', fontWeight: '500', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                다음 추첨까지
+              </span>
+            </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-around', gap: 'clamp(8px, 2vw, 10px)' }}>
-            {[
-              { value: days, label: '일' },
-              { value: hours, label: '시간' },
-              { value: minutes, label: '분' },
-              { value: seconds, label: '초' },
-            ].map((item, index) => (
-              <div
-                key={index}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 'clamp(6px, 2vw, 8px)',
-                }}
-              >
+            {/* 타이머 */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'clamp(8px, 2vw, 10px)' }}>
+              {/* 일 */}
+              <div style={{ flex: 1, maxWidth: 'clamp(70px, 18vw, 85px)' }}>
                 <div
                   style={{
-                    background: '#4A4A4A',
-                    borderRadius: 'clamp(10px, 3vw, 12px)',
-                    padding: 'clamp(12px, 3vw, 15px)',
-                    minWidth: 'clamp(50px, 12vw, 60px)',
+                    background: '#414141',
+                    borderRadius: 'clamp(5px, 1.2vw, 6px)',
+                    padding: 'clamp(14px, 3.5vw, 18px) clamp(10px, 2.5vw, 12px)',
+                    textAlign: 'center',
+                    aspectRatio: '1',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: 'clamp(20px, 5vw, 28px)',
-                      fontWeight: '700',
-                      color: 'white',
-                      fontFamily: 'SF Pro, Arial, sans-serif',
-                    }}
-                  >
-                    {String(item.value).padStart(2, '0')}
-                  </span>
+                  <div style={{ fontSize: 'clamp(36px, 9vw, 48px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
+                    {days}
+                  </div>
                 </div>
-                <span
+                <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#000', textAlign: 'center', marginTop: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  일
+                </div>
+              </div>
+
+              {/* 구분자 : */}
+              <div style={{ fontSize: 'clamp(32px, 8vw, 40px)', fontWeight: '700', color: '#000', paddingBottom: 'clamp(20px, 5vw, 25px)' }}>
+                :
+              </div>
+
+              {/* 시간 */}
+              <div style={{ flex: 1, maxWidth: 'clamp(70px, 18vw, 85px)' }}>
+                <div
                   style={{
-                    fontSize: 'clamp(12px, 3vw, 14px)',
-                    color: '#666',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
+                    background: '#414141',
+                    borderRadius: 'clamp(5px, 1.2vw, 6px)',
+                    padding: 'clamp(14px, 3.5vw, 18px) clamp(10px, 2.5vw, 12px)',
+                    textAlign: 'center',
+                    aspectRatio: '1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  {item.label}
-                </span>
+                  <div style={{ fontSize: 'clamp(36px, 9vw, 48px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
+                    {hours}
+                  </div>
+                </div>
+                <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#000', textAlign: 'center', marginTop: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  시간
+                </div>
               </div>
-            ))}
+
+              {/* 구분자 : */}
+              <div style={{ fontSize: 'clamp(32px, 8vw, 40px)', fontWeight: '700', color: '#000', paddingBottom: 'clamp(20px, 5vw, 25px)' }}>
+                :
+              </div>
+
+              {/* 분 */}
+              <div style={{ flex: 1, maxWidth: 'clamp(70px, 18vw, 85px)' }}>
+                <div
+                  style={{
+                    background: '#414141',
+                    borderRadius: 'clamp(5px, 1.2vw, 6px)',
+                    padding: 'clamp(14px, 3.5vw, 18px) clamp(10px, 2.5vw, 12px)',
+                    textAlign: 'center',
+                    aspectRatio: '1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 'clamp(36px, 9vw, 48px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
+                    {minutes}
+                  </div>
+                </div>
+                <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#000', textAlign: 'center', marginTop: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  분
+                </div>
+              </div>
+
+              {/* 구분자 : */}
+              <div style={{ fontSize: 'clamp(32px, 8vw, 40px)', fontWeight: '700', color: '#000', paddingBottom: 'clamp(20px, 5vw, 25px)' }}>
+                :
+              </div>
+
+              {/* 초 */}
+              <div style={{ flex: 1, maxWidth: 'clamp(70px, 18vw, 85px)' }}>
+                <div
+                  style={{
+                    background: '#414141',
+                    borderRadius: 'clamp(5px, 1.2vw, 6px)',
+                    padding: 'clamp(14px, 3.5vw, 18px) clamp(10px, 2.5vw, 12px)',
+                    textAlign: 'center',
+                    aspectRatio: '1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 'clamp(36px, 9vw, 48px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
+                    {seconds}
+                  </div>
+                </div>
+                <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#000', textAlign: 'center', marginTop: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  초
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 누적 상금 카드 */}
+        <div
+          style={{
+            padding: '0 clamp(15px, 4vw, 20px) clamp(15px, 4vw, 20px)',
+          }}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #6B0F70 0%, #4A0E68 100%)',
+              borderRadius: 'clamp(8px, 2vw, 10px)',
+              padding: 'clamp(20px, 5vw, 25px)',
+              border: '0.5px solid rgba(255, 255, 255, 0.3)',
+              textAlign: 'center',
+            }}
+          >
+            {/* 타이틀 */}
+            <div style={{ fontSize: 'clamp(15px, 3.8vw, 18px)', fontWeight: '700', color: '#FFF', marginBottom: 'clamp(15px, 4vw, 20px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+              누적 상금
+            </div>
+
+            {/* 메인 금액 */}
+            <div style={{ marginBottom: 'clamp(8px, 2vw, 10px)' }}>
+              <div style={{ fontSize: 'clamp(32px, 8vw, 42px)', fontWeight: '700', color: '#93EE00', letterSpacing: '0.02em', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1.2' }}>
+                {parseInt(totalPrize).toLocaleString()} KAIA
+              </div>
+            </div>
+
+            {/* 원화 */}
+            <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: '600', color: '#FFD700', marginBottom: 'clamp(18px, 4.5vw, 22px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+              ₩{totalPrizeKRW}
+            </div>
+
+            {/* 하단 정보 */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'clamp(10px, 2.5vw, 12px)' }}>
+              <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                참여자
+              </div>
+              <div style={{ width: '1px', height: 'clamp(10px, 2.5vw, 12px)', background: '#FFF' }} />
+              <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#FFF', fontWeight: '600', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                총 {ticketCount}명
+              </div>
+            </div>
           </div>
         </div>
 
         {/* KAIA 카드 */}
         <div
           style={{
-            background: 'linear-gradient(135deg, #6B46C1 0%, #9333EA 100%)',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(20px, 5vw, 25px)',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
-            boxShadow: '0 8px 24px rgba(147, 51, 234, 0.3)',
+            padding: '0 clamp(15px, 4vw, 20px) clamp(15px, 4vw, 20px)',
           }}
         >
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 'clamp(15px, 4vw, 20px)',
+              background: 'linear-gradient(292deg, #6E0058 6.55%, #450058 65.52%)',
+              borderRadius: 'clamp(8px, 2vw, 10px)',
+              padding: 'clamp(18px, 4.5vw, 22px) clamp(15px, 4vw, 20px)',
+              border: '0.5px solid #FFFFFF',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(12px, 3vw, 15px)' }}>
-              {/* KAIA 아이콘 */}
-              <div
-                style={{
-                  width: 'clamp(40px, 10vw, 50px)',
-                  height: 'clamp(40px, 10vw, 50px)',
-                  background: 'white',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <span style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: '700', color: '#FF6B00' }}>K</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'clamp(15px, 4vw, 20px)' }}>
+              {/* 왼쪽: 코인 아이콘 + 이름 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(10px, 2.5vw, 12px)' }}>
+                <div style={{ width: 'clamp(48px, 12vw, 57px)', height: 'clamp(48px, 12vw, 57px)', position: 'relative' }}>
+                  <Image
+                    src="/coin-icon.png"
+                    alt="KAIA"
+                    width={57}
+                    height={57}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                    KAIA
+                  </div>
+                  <div style={{ fontSize: 'clamp(9px, 2.3vw, 10px)', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', marginTop: 'clamp(2px, 0.5vw, 3px)' }}>
+                    카이아
+                  </div>
+                </div>
               </div>
+
+              {/* 오른쪽: 가격 정보 */}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  {ticketPrice} KAIA
+                </div>
+                <div style={{ fontSize: 'clamp(11px, 2.8vw, 12px)', fontWeight: '700', color: '#34D055', marginTop: 'clamp(2px, 0.5vw, 3px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  +1.8%
+                </div>
+              </div>
+            </div>
+
+            <div style={{ height: '0.3px', background: '#FFF', marginBottom: 'clamp(15px, 4vw, 20px)' }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div
-                  style={{
-                    fontSize: 'clamp(18px, 4.5vw, 22px)',
-                    fontWeight: '700',
-                    color: 'white',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                  }}
-                >
-                  KAIA
+                <div style={{ fontSize: 'clamp(11px, 2.8vw, 12px)', color: '#FFF', marginBottom: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  현재 회차 금액
                 </div>
-                <div
-                  style={{
-                    fontSize: 'clamp(12px, 3vw, 14px)',
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                  }}
-                >
-                  카이아
+                <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  {currentDrawPrize} KAIA
                 </div>
               </div>
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-              <div
-                style={{
-                  fontSize: 'clamp(18px, 4.5vw, 22px)',
-                  fontWeight: '700',
-                  color: 'white',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                티켓 {ticketPrice} KAIA
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  color: '#93EE00',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                ₩ {(parseFloat(ticketPrice) * 1430).toFixed(0)}원
-              </div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-              paddingTop: 'clamp(15px, 4vw, 20px)',
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  marginBottom: 'clamp(6px, 2vw, 8px)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                현재 회차 상금
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(18px, 4.5vw, 22px)',
-                  fontWeight: '700',
-                  color: 'white',
-                  marginBottom: 'clamp(4px, 1vw, 5px)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                {totalPrize} KAIA
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                ₩ {parseInt(totalPrizeKRW).toLocaleString()}원
-              </div>
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-              <div
-                style={{
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  marginBottom: 'clamp(6px, 2vw, 8px)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                참여자
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(18px, 4.5vw, 22px)',
-                  fontWeight: '700',
-                  color: 'white',
-                  marginBottom: 'clamp(4px, 1vw, 5px)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                총 {ticketCount}명
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                {ticketCount > 0 ? '🎫 티켓 판매중' : '🎫 첫 참여자가 되세요!'}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 'clamp(11px, 2.8vw, 12px)', color: '#FFF', marginBottom: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  이월된 금액
+                </div>
+                <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  {parseFloat(accumulatedJackpot).toFixed(2)} KAIA
+                </div>
               </div>
             </div>
           </div>
         </div>
-
-        {/* 복권 사기 버튼 */}
-        <button
-          onClick={() => router.push('/buy')}
-          style={{
-            width: '100%',
-            height: 'clamp(55px, 10vh, 70px)',
-            background: 'linear-gradient(135deg, #93EE00 0%, #7BC800 100%)',
-            border: 'none',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            color: 'white',
-            fontSize: 'clamp(18px, 5vw, 24px)',
-            fontWeight: '700',
-            cursor: 'pointer',
-            fontFamily: 'SF Pro, Arial, sans-serif',
-            boxShadow: '0 6px 20px rgba(147, 238, 0, 0.4)',
-            transition: 'all 0.3s ease',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 8px 25px rgba(147, 238, 0, 0.5)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(147, 238, 0, 0.4)';
-          }}
-        >
-          🎫 복권 사기
-        </button>
       </div>
     </MobileLayout>
   );

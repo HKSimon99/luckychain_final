@@ -1,11 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function WalletConnectPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+
+  // 약관 동의 체크
+  useEffect(() => {
+    const agreementCompleted = localStorage.getItem('agreementCompleted');
+    if (!agreementCompleted) {
+      router.push('/agreement');
+    }
+  }, [router]);
 
   const connectWallet = async () => {
     if (typeof window.ethereum === 'undefined') {

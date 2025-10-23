@@ -1,13 +1,37 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
 
 export default function SplashPage() {
   const router = useRouter();
+  const [fadeOut, setFadeOut] = useState(false);
+
+  useEffect(() => {
+    // 2초 후 fade out 시작
+    const fadeTimer = setTimeout(() => {
+      setFadeOut(true);
+    }, 2000);
+
+    // 3초 후 페이지 전환 (fade out 애니메이션 완료 후)
+    const navTimer = setTimeout(() => {
+      const agreementCompleted = localStorage.getItem('agreementCompleted');
+      if (agreementCompleted) {
+        router.push('/wallet');
+      } else {
+        router.push('/agreement');
+      }
+    }, 3000);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(navTimer);
+    };
+  }, [router]);
 
   return (
     <div
-      onClick={() => router.push('/wallet')}
       style={{
         width: '100%',
         height: '100vh',
@@ -16,55 +40,34 @@ export default function SplashPage() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        cursor: 'pointer',
         gap: 'clamp(30px, 5vh, 40px)',
+        opacity: fadeOut ? 0 : 1,
+        transition: 'opacity 1s ease-out',
       }}
     >
-      {/* 클로버 + 코인 아이콘 */}
+      {/* 로고 이미지 */}
       <div
         style={{
           width: 'clamp(150px, 30vw, 200px)',
           height: 'clamp(150px, 30vw, 200px)',
+          position: 'relative',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 200 200"
-          fill="none"
-          style={{ maxWidth: '200px', maxHeight: '200px' }}
-        >
-          {/* 클로버 4개 잎 */}
-          <circle cx="100" cy="70" r="30" fill="#4A9B8E" />
-          <circle cx="70" cy="100" r="30" fill="#4A9B8E" />
-          <circle cx="130" cy="100" r="30" fill="#4A9B8E" />
-          <circle cx="100" cy="130" r="30" fill="#4A9B8E" />
-          
-          {/* 코인 링 */}
-          <ellipse
-            cx="120"
-            cy="90"
-            rx="20"
-            ry="35"
-            fill="none"
-            stroke="#F4D98B"
-            strokeWidth="8"
-            transform="rotate(45 120 90)"
-          />
-          <ellipse
-            cx="110"
-            cy="110"
-            rx="20"
-            ry="35"
-            fill="none"
-            stroke="#F4D98B"
-            strokeWidth="8"
-            transform="rotate(45 110 110)"
-          />
-        </svg>
+        <Image
+          src="/logo.png"
+          alt="Luckychain Logo"
+          width={200}
+          height={200}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+          }}
+          priority
+        />
       </div>
 
       {/* Luckychain 텍스트 */}
@@ -79,19 +82,6 @@ export default function SplashPage() {
         }}
       >
         Luckychain
-      </div>
-
-      {/* 탭 안내 텍스트 (선택사항) */}
-      <div
-        style={{
-          fontSize: 'clamp(12px, 3vw, 14px)',
-          color: 'rgba(255, 255, 255, 0.6)',
-          fontFamily: 'SF Pro, Arial, sans-serif',
-          textAlign: 'center',
-          marginTop: 'clamp(20px, 5vh, 40px)',
-        }}
-      >
-        화면을 탭하여 시작
       </div>
     </div>
   );
