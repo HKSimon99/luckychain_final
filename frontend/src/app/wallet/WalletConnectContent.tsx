@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import Image from 'next/image';
+import '@/config/appkit'; // AppKit 초기화 보장
 
 export default function WalletConnectContent() {
   const router = useRouter();
