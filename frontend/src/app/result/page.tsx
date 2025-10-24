@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import MobileLayout from '@/components/MobileLayout';
-import * as lottoAbiModule from '../../../lib/lottoAbi.json';
+import Header from '@/components/Header';
+import * as lottoAbiModule from '@/lib/lottoAbi.json';
 
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
@@ -152,6 +153,8 @@ export default function ResultPage() {
 
   return (
     <MobileLayout>
+      <Header />
+      
       {/* 메인 콘텐츠 */}
       <div
         style={{

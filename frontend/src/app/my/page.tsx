@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ethers } from 'ethers';
 import MobileLayout from '@/components/MobileLayout';
-import * as lottoAbiModule from '../../../lib/lotto-abi-full.json';
+import Header from '@/components/Header';
+import * as lottoAbiModule from '@/lib/lotto-abi-full.json';
 
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
@@ -47,8 +48,10 @@ export default function MyPage() {
             // 티켓 로드
             await loadMyTickets(accounts[0]);
           }
-        } catch (error) {
-          console.error('지갑 확인 실패:', error);
+        } catch (error: any) {
+          console.error('❌ 지갑 확인 실패:', error);
+          console.error('❌ 에러 메시지:', error?.message || '알 수 없는 오류');
+          console.error('❌ 에러 스택:', error?.stack);
         } finally {
           setIsLoading(false);
         }
@@ -140,8 +143,11 @@ export default function MyPage() {
 
       setMyTickets(tickets.sort((a, b) => b.drawId - a.drawId));
       console.log('✅ 티켓 로드 완료:', tickets.length);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ 티켓 로드 실패:', error);
+      console.error('❌ 에러 메시지:', error?.message || '알 수 없는 오류');
+      console.error('❌ 에러 코드:', error?.code);
+      console.error('❌ 에러 상세:', JSON.stringify(error, null, 2));
     }
   };
 
@@ -163,8 +169,10 @@ export default function MyPage() {
       setBalance((parseInt(balanceHex, 16) / 1e18).toFixed(4));
 
       await loadMyTickets(accounts[0]);
-    } catch (error) {
-      console.error('지갑 연결 실패:', error);
+    } catch (error: any) {
+      console.error('❌ 지갑 연결 실패:', error);
+      console.error('❌ 에러 메시지:', error?.message || '알 수 없는 오류');
+      alert('지갑 연결에 실패했습니다: ' + (error?.message || '알 수 없는 오류'));
     }
   };
 
@@ -245,6 +253,8 @@ export default function MyPage() {
 
   return (
     <MobileLayout>
+      <Header />
+      
       {/* 메인 콘텐츠 */}
       <div
         style={{

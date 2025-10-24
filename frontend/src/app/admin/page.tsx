@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ethers } from 'ethers';
 import MobileLayout from '@/components/MobileLayout';
-import * as lottoAbiModule from '../../../lib/lotto-abi-full.json';
-import * as mockVrfAbiModule from '../../../lib/mockVrfAbi.json';
+import Header from '@/components/Header';
+import * as lottoAbiModule from '@/lib/lotto-abi-full.json';
+import * as mockVrfAbiModule from '@/lib/mockVrfAbi.json';
 
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const mockVrfAbi = (mockVrfAbiModule as any).default || mockVrfAbiModule;
@@ -559,6 +560,8 @@ export default function AdminPage() {
 
   return (
     <MobileLayout showBottomNav={false}>
+      <Header />
+      
       {/* 메인 콘텐츠 */}
       <div
         style={{

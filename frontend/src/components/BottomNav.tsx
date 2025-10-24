@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import React from 'react';
+import React, { useState } from 'react';
+import Image from 'next/image';
 
 interface BottomNavProps {
   className?: string;
@@ -10,12 +11,13 @@ interface BottomNavProps {
 export default function BottomNav({ className = '' }: BottomNavProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const navItems = [
-    { icon: '🏠', label: '홈', path: '/' },
-    { icon: '🎫', label: '복권', path: '/buy' },
-    { icon: '🏆', label: '결과', path: '/result' },
-    { icon: '👤', label: '마이', path: '/my' },
+    { icon: '홈.webp', label: '홈', path: '/' },
+    { icon: '복권 사기.webp', label: '복권 사기', path: '/buy' },
+    { icon: '복권 결과.webp', label: '복권 결과', path: '/result' },
+    { icon: '마이.webp', label: '마이', path: '/my' },
   ];
 
   return (
@@ -27,86 +29,89 @@ export default function BottomNav({ className = '' }: BottomNavProps) {
         left: 0,
         right: 0,
         width: '100%',
-        height: 'clamp(60px, 8vh, 70px)',
-        background: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(10px)',
-        borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+        height: 'clamp(70px, 9vh, 80px)',
+        background: 'linear-gradient(180deg, rgba(246, 239, 252, 0.98) 0%, rgba(250, 245, 255, 0.98) 100%)',
+        backdropFilter: 'blur(20px)',
+        borderTop: '1px solid rgba(167, 139, 250, 0.15)',
+        borderTopLeftRadius: 'clamp(20px, 5vw, 28px)',
+        borderTopRightRadius: 'clamp(20px, 5vw, 28px)',
         display: 'flex',
         justifyContent: 'space-around',
         alignItems: 'center',
-        padding: '0 clamp(15px, 4vw, 20px)',
-        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.05)',
+        padding: '0 clamp(20px, 5vw, 30px)',
+        boxShadow: '0 -4px 20px rgba(139, 92, 246, 0.08)',
         zIndex: 1000,
       }}
     >
       {navItems.map((item, index) => {
         const isActive = pathname === item.path;
+        const isHovered = hoveredIndex === index;
         return (
           <button
             key={index}
             onClick={() => router.push(item.path)}
+            onMouseEnter={() => setHoveredIndex(index)}
+            onMouseLeave={() => setHoveredIndex(null)}
+            onTouchStart={() => setHoveredIndex(index)}
+            onTouchEnd={() => setHoveredIndex(null)}
             style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '4px',
-              background: 'none',
+              justifyContent: 'center',
+              gap: 'clamp(4px, 1vh, 6px)',
+              background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              padding: '8px 12px',
-              borderRadius: '12px',
-              transition: 'all 0.2s ease',
+              padding: 'clamp(8px, 2vh, 12px) clamp(12px, 3vw, 16px)',
+              borderRadius: 'clamp(12px, 3vw, 16px)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               position: 'relative',
-            }}
-            onMouseEnter={(e) => {
-              if (!isActive) {
-                e.currentTarget.style.background = 'rgba(139, 92, 246, 0.08)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isActive) {
-                e.currentTarget.style.background = 'none';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }
+              transform: 'translateY(0)',
+              boxShadow: 'none',
             }}
           >
-            {/* Active 인디케이터 */}
-            {isActive && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '-2px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '24px',
-                  height: '3px',
-                  background: 'linear-gradient(90deg, #8B5CF6, #A78BFA)',
-                  borderRadius: '0 0 3px 3px',
-                }}
-              />
-            )}
-
             {/* 아이콘 */}
             <div
               style={{
-                fontSize: 'clamp(20px, 5vw, 24px)',
-                opacity: isActive ? 1 : 0.5,
-                transform: isActive ? 'scale(1.1)' : 'scale(1)',
-                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: isActive ? 'scale(1.1)' : isHovered ? 'scale(1.05)' : 'scale(1)',
+                width: 'clamp(24px, 6vw, 28px)',
+                height: 'clamp(24px, 6vw, 28px)',
+                position: 'relative',
+                filter: isActive
+                  ? 'brightness(0) saturate(100%) invert(18%) sepia(91%) saturate(7466%) hue-rotate(318deg) brightness(92%) contrast(110%)'
+                  : isHovered
+                  ? 'brightness(0) saturate(100%) invert(54%) sepia(93%) saturate(4729%) hue-rotate(245deg) brightness(94%) contrast(101%)'
+                  : 'brightness(0) saturate(100%) invert(68%) sepia(8%) saturate(280%) hue-rotate(181deg) brightness(91%) contrast(85%)',
               }}
             >
-              {item.icon}
+              <Image
+                src={`/img/nav/${item.icon}`}
+                alt={item.label}
+                width={28}
+                height={28}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                }}
+                priority
+              />
             </div>
 
             {/* 라벨 */}
             <span
               style={{
-                fontSize: 'clamp(10px, 2.5vw, 11px)',
-                color: isActive ? '#8B5CF6' : '#666',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-                fontWeight: isActive ? '600' : '500',
-                transition: 'all 0.2s ease',
+                fontSize: 'clamp(10px, 2.5vw, 12px)',
+                color: isActive ? '#E700B1' : isHovered ? '#A855F7' : '#6B7280',
+                fontFamily: 'SF Pro, -apple-system, BlinkMacSystemFont, Arial, sans-serif',
+                fontWeight: isActive ? '700' : isHovered ? '600' : '500',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                letterSpacing: '-0.01em',
               }}
             >
               {item.label}
@@ -114,6 +119,7 @@ export default function BottomNav({ className = '' }: BottomNavProps) {
           </button>
         );
       })}
+
     </div>
   );
 }

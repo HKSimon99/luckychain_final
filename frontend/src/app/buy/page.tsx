@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ethers } from 'ethers';
 import MobileLayout from '@/components/MobileLayout';
-import * as lottoAbiModule from '../../../lib/lottoAbi.json';
+import Header from '@/components/Header';
+import * as lottoAbiModule from '@/lib/lottoAbi.json';
+import { useKaiaPrice } from '@/contexts/KaiaPriceContext';
 
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
@@ -16,6 +18,7 @@ interface TicketSet {
 
 export default function BuyTicketPage() {
   const router = useRouter();
+  const { kaiaPrice } = useKaiaPrice(); // KAIA 실시간 가격
   const [ticketSets, setTicketSets] = useState<TicketSet[]>([{ id: 1, numbers: [] }]);
   const [currentSetId, setCurrentSetId] = useState(1);
   const [ticketPrice, setTicketPrice] = useState('0.01');
@@ -277,8 +280,8 @@ export default function BuyTicketPage() {
         `✅ 티켓 ${completedTickets.length}장 구매 완료! 🎉\n\n총 비용: ${totalPrice} KAIA\n\n한 번의 트랜잭션으로 완료!\n마이페이지에서 확인하세요!`
       );
 
-      // 홈으로 이동
-      router.push('/');
+      // 포춘쿠키 페이지로 이동
+      router.push('/fortune');
     } catch (error: any) {
       console.error('❌ 티켓 구매 실패:', error);
 
@@ -357,40 +360,7 @@ export default function BuyTicketPage() {
 
   return (
     <MobileLayout>
-      {/* 헤더 */}
-      <div
-        style={{
-          background: 'white',
-          padding: 'clamp(12px, 3vw, 15px) clamp(15px, 4vw, 20px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(0,0,0,0.1)',
-        }}
-      >
-        <button
-          onClick={() => router.back()}
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: 'clamp(20px, 5vw, 24px)',
-            cursor: 'pointer',
-          }}
-        >
-          ← 
-        </button>
-        <span
-          style={{
-            fontSize: 'clamp(16px, 4vw, 18px)',
-            fontWeight: '600',
-            color: '#333',
-            fontFamily: 'SF Pro, Arial, sans-serif',
-          }}
-        >
-          복권 구매
-        </span>
-        <div style={{ width: 'clamp(20px, 5vw, 24px)' }} /> {/* 빈 공간 (정렬용) */}
-      </div>
+      <Header />
 
       {/* 지갑 정보 바 */}
       <div
@@ -878,7 +848,7 @@ export default function BuyTicketPage() {
                   fontFamily: 'SF Pro, Arial, sans-serif',
                 }}
               >
-                ≈ ₩{(parseFloat(ticketPrice) * 1430).toFixed(0)}
+                ≈ ₩{(parseFloat(ticketPrice) * kaiaPrice).toFixed(0)}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -908,7 +878,7 @@ export default function BuyTicketPage() {
                   fontFamily: 'SF Pro, Arial, sans-serif',
                 }}
               >
-                ≈ ₩{((parseFloat(ticketPrice) * ticketSets.length * 1430).toFixed(0))}
+                ≈ ₩{((parseFloat(ticketPrice) * ticketSets.length * kaiaPrice).toFixed(0))}
               </div>
             </div>
           </div>

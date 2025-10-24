@@ -6,13 +6,11 @@ import BottomNav from './BottomNav';
 interface MobileLayoutProps {
   children: ReactNode;
   showBottomNav?: boolean;
-  showStatusBar?: boolean;
 }
 
 export default function MobileLayout({
   children,
   showBottomNav = true,
-  showStatusBar = true,
 }: MobileLayoutProps) {
   return (
     <div
@@ -40,39 +38,13 @@ export default function MobileLayout({
           background: '#380D44',
         }}
       >
-        {/* 상단 상태바 */}
-        {showStatusBar && (
-          <div
-            style={{
-              height: 'clamp(40px, 5vh, 44px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0 clamp(15px, 4vw, 20px)',
-              color: 'white',
-              fontSize: 'clamp(13px, 3.5vw, 15px)',
-              fontWeight: '600',
-              background: 'transparent',
-              position: 'relative',
-              zIndex: 100,
-            }}
-          >
-            <div>9:41</div>
-            <div style={{ display: 'flex', gap: 'clamp(3px, 1vw, 5px)' }}>
-              <div>📶</div>
-              <div>📡</div>
-              <div>🔋</div>
-            </div>
-          </div>
-        )}
-
         {/* 메인 콘텐츠 영역 */}
         <div
           style={{
             width: '100%',
             height: showBottomNav 
-              ? 'calc(100% - clamp(40px, 5vh, 44px) - clamp(60px, 8vh, 70px))' 
-              : 'calc(100% - clamp(40px, 5vh, 44px))',
+              ? 'calc(100% - clamp(60px, 8vh, 70px))' 
+              : '100%',
             overflowY: 'auto',
             overflowX: 'hidden',
             position: 'relative',
