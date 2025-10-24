@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
-import { useWeb3Modal } from '@web3modal/wagmi/react';
+import { useAppKit } from '@reown/appkit/react';
 import Image from 'next/image';
 
 export default function WalletConnectPage() {
@@ -11,7 +11,7 @@ export default function WalletConnectPage() {
   const [isChecking, setIsChecking] = useState(true);
   
   const { address, isConnected, chain } = useAccount();
-  const { open } = useWeb3Modal();
+  const { open } = useAppKit();
   const { switchChain } = useSwitchChain();
 
   // 약관 동의 체크

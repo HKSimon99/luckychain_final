@@ -1,9 +1,7 @@
-import { defaultWagmiConfig } from '@web3modal/wagmi/react/config';
-import { createWeb3Modal } from '@web3modal/wagmi/react';
-import { defineChain } from 'viem';
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 
-// Kaia Kairos 테스트넷 정의
-export const kaiaKairos = defineChain({
+// Kaia Kairos 테스트넷 정의 (AppKit 호환 형식)
+export const kaiaKairos = {
   id: 1001,
   name: 'Kaia Kairos Testnet',
   nativeCurrency: {
@@ -26,33 +24,36 @@ export const kaiaKairos = defineChain({
     },
   },
   testnet: true,
-});
+  caipNetworkId: 'eip155:1001',
+  chainNamespace: 'eip155',
+};
 
 // WalletConnect Project ID
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '';
+export const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '';
 
 if (!projectId) {
   console.warn('⚠️  WalletConnect Project ID가 설정되지 않았습니다.');
   console.warn('   https://cloud.walletconnect.com 에서 Project ID를 발급받으세요.');
 }
 
-// Wagmi 설정
-const metadata = {
+// Metadata
+export const metadata = {
   name: 'Luckychain',
   description: 'Orakl VRF를 활용한 탈중앙화 로또 시스템',
-  url: typeof window !== 'undefined' ? window.location.origin : '',
+  url: typeof window !== 'undefined' ? window.location.origin : 'https://luckychain.app',
   icons: ['/logo.png'],
 };
 
-export const config = defaultWagmiConfig({
-  chains: [kaiaKairos],
+// Networks (createAppKit에서 최소 1개 요구)
+export const networks = [kaiaKairos];
+
+// Wagmi Adapter
+export const wagmiAdapter = new WagmiAdapter({
   projectId,
-  metadata,
-  enableAnalytics: true, // 선택사항
-  enableOnramp: false, // 암호화폐 구매 기능 비활성화
+  networks,
 });
 
-export { projectId };
+export const config = wagmiAdapter.wagmiConfig;
 
-// Web3Modal은 Provider에서 초기화합니다
+// AppKit은 Provider에서 초기화합니다
 
