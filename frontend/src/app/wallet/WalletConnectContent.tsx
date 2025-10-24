@@ -39,15 +39,9 @@ export default function WalletConnectContent() {
         } catch (error) {
           console.error('네트워크 전환 실패:', error);
         }
-      } else {
-        // 올바른 네트워크에 연결됨
-        console.log('🎉 지갑 연결 완료! 홈으로 이동...');
-        setTimeout(() => {
-          router.push('/');
-        }, 1000);
       }
     }
-  }, [isConnected, address, chain, router, switchChain]);
+  }, [isConnected, address, chain, switchChain]);
 
   const connectWallet = async () => {
     try {
@@ -217,27 +211,60 @@ export default function WalletConnectContent() {
       )}
 
       {isConnected && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            fontSize: 'clamp(13px, 3.3vw, 15px)',
-            color: '#93EE00',
-            fontFamily: 'SF Pro, Arial, sans-serif',
-          }}
-        >
+        <>
           <div
             style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: '#93EE00',
-              animation: 'pulse 1.5s infinite',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              fontSize: 'clamp(13px, 3.3vw, 15px)',
+              color: '#93EE00',
+              fontFamily: 'SF Pro, Arial, sans-serif',
+              marginBottom: 'clamp(20px, 5vw, 30px)',
             }}
-          />
-          연결 완료
-        </div>
+          >
+            <div
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: '#93EE00',
+                animation: 'pulse 1.5s infinite',
+              }}
+            />
+            연결 완료
+          </div>
+
+          {/* 홈으로 가기 버튼 */}
+          <button
+            onClick={() => router.push('/')}
+            style={{
+              width: '100%',
+              maxWidth: '350px',
+              padding: 'clamp(14px, 3.5vw, 18px) clamp(20px, 5vw, 30px)',
+              background: 'linear-gradient(135deg, #93EE00 0%, #7BC800 100%)',
+              color: '#000',
+              fontSize: 'clamp(15px, 4vw, 18px)',
+              fontWeight: '700',
+              border: 'none',
+              borderRadius: 'clamp(10px, 2.5vw, 12px)',
+              cursor: 'pointer',
+              fontFamily: 'SF Pro, Arial, sans-serif',
+              boxShadow: '0 4px 15px rgba(147, 238, 0, 0.3)',
+              transition: 'all 0.3s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(147, 238, 0, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(147, 238, 0, 0.3)';
+            }}
+          >
+            🏠 홈으로 가기
+          </button>
+        </>
       )}
 
       <style jsx>{`

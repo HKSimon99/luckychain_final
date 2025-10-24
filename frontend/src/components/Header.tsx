@@ -1,8 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount, useDisconnect } from 'wagmi';
+import { useAppKit } from '@reown/appkit/react';
 import Image from 'next/image';
 import MobileStatusBar from './MobileStatusBar';
+import '@/config/appkit'; // AppKit 초기화 보장
 
 interface HeaderProps {
   showMenu?: boolean;
@@ -10,6 +14,27 @@ interface HeaderProps {
 
 export default function Header({ showMenu = true }: HeaderProps) {
   const router = useRouter();
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { open } = useAppKit();
+  const [showWalletMenu, setShowWalletMenu] = useState(false);
+
+  const handleWalletClick = () => {
+    if (isConnected) {
+      setShowWalletMenu(!showWalletMenu);
+    } else {
+      open();
+    }
+  };
+
+  const handleDisconnect = () => {
+    disconnect();
+    setShowWalletMenu(false);
+  };
+
+  const formatAddress = (addr: string) => {
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
 
   return (
     <div
@@ -66,22 +91,95 @@ export default function Header({ showMenu = true }: HeaderProps) {
         </span>
       </div>
 
-      {/* 햄버거 메뉴 */}
-      {showMenu && (
-        <div
-          onClick={() => router.push('/admin')}
-          style={{
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'clamp(4px, 1vw, 5px)',
-          }}
-        >
-          <div style={{ width: 'clamp(20px, 5vw, 24px)', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
-          <div style={{ width: 'clamp(20px, 5vw, 24px)', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
-          <div style={{ width: 'clamp(20px, 5vw, 24px)', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
+      {/* 오른쪽: 지갑 + 메뉴 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(10px, 2.5vw, 15px)' }}>
+        {/* 지갑 연결 버튼 */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={handleWalletClick}
+            style={{
+              padding: 'clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 12px)',
+              background: isConnected ? '#93EE00' : '#380D44',
+              color: isConnected ? '#000' : '#FFF',
+              border: 'none',
+              borderRadius: 'clamp(8px, 2vw, 10px)',
+              fontSize: 'clamp(11px, 2.8vw, 13px)',
+              fontWeight: '600',
+              cursor: 'pointer',
+              fontFamily: 'SF Pro, Arial, sans-serif',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {isConnected ? `🔗 ${formatAddress(address!)}` : '🔗 연결'}
+          </button>
+
+          {/* 지갑 메뉴 (연결됨) */}
+          {showWalletMenu && isConnected && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 5px)',
+                right: 0,
+                background: 'white',
+                border: '1px solid #380D44',
+                borderRadius: '8px',
+                padding: '8px',
+                minWidth: '150px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                zIndex: 1000,
+              }}
+            >
+              <button
+                onClick={() => { open(); setShowWalletMenu(false); }}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: 'transparent',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  borderBottom: '1px solid #eee',
+                }}
+              >
+                🔄 변경하기
+              </button>
+              <button
+                onClick={handleDisconnect}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: 'transparent',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  color: '#FF3B30',
+                }}
+              >
+                🔌 연결 해제
+              </button>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* 햄버거 메뉴 */}
+        {showMenu && (
+          <div
+            onClick={() => router.push('/admin')}
+            style={{
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'clamp(4px, 1vw, 5px)',
+            }}
+          >
+            <div style={{ width: 'clamp(20px, 5vw, 24px)', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
+            <div style={{ width: 'clamp(20px, 5vw, 24px)', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
+            <div style={{ width: 'clamp(20px, 5vw, 24px)', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
+          </div>
+        )}
+      </div>
       </div>
     </div>
   );

@@ -1,13 +1,51 @@
 import { createAppKit } from '@reown/appkit/react';
 import { projectId, metadata, wagmiAdapter, networks } from './walletconnect';
 
-// AppKit 초기화 (모듈 로드 시 즉시 실행)
+// AppKit 초기화 상태
 let appKitInstance: ReturnType<typeof createAppKit> | null = null;
+let isInitializing = false;
+let isInitialized = false;
 
-export function initializeAppKit() {
-  // 브라우저 환경이고, 아직 초기화되지 않았을 때만 실행
-  if (typeof window !== 'undefined' && !appKitInstance && projectId) {
+export function initializeAppKit(): Promise<boolean> {
+  // 이미 초기화되었으면 즉시 반환
+  if (isInitialized) {
+    return Promise.resolve(true);
+  }
+
+  // 초기화 중이면 대기
+  if (isInitializing) {
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        if (isInitialized) {
+          clearInterval(checkInterval);
+          resolve(true);
+        }
+      }, 50);
+      // 최대 5초 대기
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        resolve(false);
+      }, 5000);
+    });
+  }
+
+  // 브라우저 환경이 아니면 실패
+  if (typeof window === 'undefined') {
+    return Promise.resolve(false);
+  }
+
+  // 초기화 시작
+  isInitializing = true;
+
+  return new Promise((resolve) => {
     try {
+      if (!projectId) {
+        console.warn('⚠️ ProjectId not found');
+        isInitializing = false;
+        resolve(false);
+        return;
+      }
+
       appKitInstance = createAppKit({
         adapters: [wagmiAdapter],
         projectId,
@@ -22,17 +60,21 @@ export function initializeAppKit() {
           '--w3m-border-radius-master': '8px',
         },
       });
+
+      isInitialized = true;
+      isInitializing = false;
       console.log('✅ AppKit initialized successfully');
+      resolve(true);
     } catch (error) {
-      console.warn('⚠️ AppKit initialization error:', error);
+      console.error('❌ AppKit initialization error:', error);
+      isInitializing = false;
+      resolve(false);
     }
-  }
-  return appKitInstance;
+  });
 }
 
-// 브라우저 환경에서 즉시 초기화
-if (typeof window !== 'undefined') {
-  initializeAppKit();
+export function isAppKitInitialized(): boolean {
+  return isInitialized;
 }
 
 export { appKitInstance };
