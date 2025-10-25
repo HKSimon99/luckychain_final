@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ethers } from 'ethers';
 import { useAccount } from 'wagmi';
+import { useAppKitProvider } from '@reown/appkit/react';
 import { useKaiaPrice } from '@/contexts/KaiaPriceContext';
 import MobileLayout from '@/components/MobileLayout';
 import MobileStatusBar from '@/components/MobileStatusBar';
@@ -20,6 +21,7 @@ interface TicketSet {
 export default function BuyTicketPage() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
+  const { walletProvider } = useAppKitProvider('eip155');
   const { kaiaPrice } = useKaiaPrice();
   
   const [step, setStep] = useState<'select' | 'numbers'>('select'); // 단계: 선택 or 번호입력
@@ -87,7 +89,12 @@ export default function BuyTicketPage() {
     setIsLoading(true);
 
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      // ✅ Reown AppKit 패턴: walletProvider 사용 (모바일 지원)
+      if (!walletProvider) {
+        throw new Error('지갑 프로바이더를 찾을 수 없습니다. 지갑을 다시 연결해주세요.');
+      }
+
+      const provider = new ethers.BrowserProvider(walletProvider as any);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
 

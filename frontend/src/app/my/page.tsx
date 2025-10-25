@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAccount, useDisconnect } from 'wagmi';
-import { useAppKit } from '@reown/appkit/react';
+import { useAppKit, useAppKitProvider } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 import Image from 'next/image';
 import MobileLayout from '@/components/MobileLayout';
@@ -19,6 +19,7 @@ export default function MyPage() {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { open } = useAppKit();
+  const { walletProvider } = useAppKitProvider('eip155');
   
   const [balance, setBalance] = useState('0');
   const [totalSpent, setTotalSpent] = useState('0');
@@ -37,9 +38,9 @@ export default function MyPage() {
       try {
         console.log('🔍 /my 페이지 데이터 로드 시작');
 
-        // 1. 잔액 조회
-        if (window.ethereum) {
-          const provider = new ethers.BrowserProvider(window.ethereum);
+        // 1. 잔액 조회 (✅ Reown AppKit 패턴: walletProvider 사용)
+        if (walletProvider) {
+          const provider = new ethers.BrowserProvider(walletProvider as any);
           const balanceWei = await provider.getBalance(address);
           const balanceKAIA = parseFloat(ethers.formatEther(balanceWei)).toFixed(2);
           setBalance(balanceKAIA);

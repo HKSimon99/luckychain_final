@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ethers } from 'ethers';
+import { useAccount } from 'wagmi';
+import { useAppKitProvider } from '@reown/appkit/react';
 import MobileLayout from '@/components/MobileLayout';
 import Header from '@/components/Header';
 import * as lottoAbiModule from '@/lib/lotto-abi-full.json';
@@ -17,6 +19,8 @@ const rpcUrl = 'https://public-en-kairos.node.kaia.io';
 
 export default function AdminPage() {
   const router = useRouter();
+  const { address: wagmiAddress, isConnected } = useAccount();
+  const { walletProvider } = useAppKitProvider('eip155');
   const [address, setAddress] = useState('');
   const [contractOwner, setContractOwner] = useState('');
   const [isOwner, setIsOwner] = useState(false);
@@ -41,15 +45,12 @@ export default function AdminPage() {
   const [currentTicketPrice, setCurrentTicketPrice] = useState('0');
   const [newTicketPrice, setNewTicketPrice] = useState('10'); // 기본값 10 KAIA
 
-  // 지갑 연결 확인
+  // 지갑 연결 확인 (✅ Reown AppKit 패턴: wagmi hook 사용)
   useEffect(() => {
     const checkWallet = async () => {
-      if (typeof window.ethereum !== 'undefined') {
+      if (isConnected && wagmiAddress) {
         try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts.length > 0) {
-            const userAddress = accounts[0];
-            setAddress(userAddress);
+          setAddress(wagmiAddress);
 
             // 컨트랙트에서 실제 owner 가져오기
             const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -58,12 +59,12 @@ export default function AdminPage() {
             setContractOwner(owner);
             
             // 현재 지갑이 owner인지 확인
-            const isOwnerWallet = userAddress.toLowerCase() === owner.toLowerCase();
+            const isOwnerWallet = wagmiAddress.toLowerCase() === owner.toLowerCase();
             setIsOwner(isOwnerWallet);
             
             console.log('📋 컨트랙트 주소:', contractAddress);
             console.log('👤 컨트랙트 Owner:', owner);
-            console.log('🔑 현재 지갑:', userAddress);
+            console.log('🔑 현재 지갑:', wagmiAddress);
             console.log('✅ Owner 권한:', isOwnerWallet);
 
             // 컨트랙트 데이터 로드
@@ -101,10 +102,18 @@ export default function AdminPage() {
     }
   };
 
-  // 지갑 연결
+  // ✅ Reown AppKit 패턴: walletProvider를 사용하는 헬퍼 함수
+  const getEthersProvider = async () => {
+    if (!walletProvider) {
+      throw new Error('지갑 프로바이더를 찾을 수 없습니다. 지갑을 다시 연결해주세요.');
+    }
+    return new ethers.BrowserProvider(walletProvider as any);
+  };
+
+  // 지갑 연결 (이미 Reown AppKit으로 연결됨)
   const connectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      alert('MetaMask를 설치해주세요!');
+    if (!isConnected || !wagmiAddress) {
+      alert('지갑을 먼저 연결해주세요! (Header의 지갑 연결 버튼 사용)');
       return;
     }
 
@@ -135,7 +144,7 @@ export default function AdminPage() {
 
     try {
       setIsLoading(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = await getEthersProvider();
       const signer = await browserProvider.getSigner();
       const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
 
@@ -174,7 +183,7 @@ export default function AdminPage() {
 
     try {
       setIsLoading(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = await getEthersProvider();
       const signer = await browserProvider.getSigner();
       const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
 
@@ -214,7 +223,7 @@ export default function AdminPage() {
 
     try {
       setIsLoading(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = await getEthersProvider();
       const signer = await browserProvider.getSigner();
       const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
 
@@ -252,7 +261,7 @@ export default function AdminPage() {
 
     try {
       setIsLoading(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = await getEthersProvider();
       const signer = await browserProvider.getSigner();
       const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
 
@@ -279,7 +288,7 @@ export default function AdminPage() {
 
     try {
       setIsLoading(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = await getEthersProvider();
       const signer = await browserProvider.getSigner();
       const mockVrfContract = new ethers.Contract(mockVrfAddress, mockVrfAbi, signer);
 
@@ -332,7 +341,7 @@ export default function AdminPage() {
       }
 
       setIsLoading(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = await getEthersProvider();
       const signer = await browserProvider.getSigner();
       const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
 
@@ -377,7 +386,7 @@ export default function AdminPage() {
 
     try {
       setIsLoading(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = await getEthersProvider();
       const signer = await browserProvider.getSigner();
       const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
 
@@ -410,7 +419,7 @@ export default function AdminPage() {
 
     try {
       setIsLoading(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = await getEthersProvider();
       const signer = await browserProvider.getSigner();
       const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
 

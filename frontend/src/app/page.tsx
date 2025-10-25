@@ -305,7 +305,7 @@ export default function HomePage() {
           >
             {/* 타이틀 */}
             <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', marginBottom: '2vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
-              현재 누적 상금
+            {currentDrawId}회차 누적 상금
               </div>
 
             {/* 메인 금액 */}

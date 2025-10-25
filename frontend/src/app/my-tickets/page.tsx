@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
+import { useAppKitProvider } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 import Image from 'next/image';
 import MobileStatusBar from '@/components/MobileStatusBar';
@@ -23,6 +24,7 @@ interface Ticket {
 export default function MyTicketsPage() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
+  const { walletProvider } = useAppKitProvider('eip155');
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
   const [currentTicketIndex, setCurrentTicketIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,12 +45,12 @@ export default function MyTicketsPage() {
       console.log('💾 저장된 트랜잭션 해시:', recentTxHash);
 
       try {
-        // BrowserProvider 사용 (CORS 우회)
-        if (!window.ethereum) {
-          throw new Error('MetaMask이 설치되지 않았습니다.');
+        // ✅ Reown AppKit 패턴: walletProvider 사용 (모바일 지원)
+        if (!walletProvider) {
+          throw new Error('지갑 프로바이더를 찾을 수 없습니다. 지갑을 다시 연결해주세요.');
         }
 
-        const provider = new ethers.BrowserProvider(window.ethereum);
+        const provider = new ethers.BrowserProvider(walletProvider as any);
         const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
 
         console.log('📡 컨트랙트 연결됨:', contractAddress);
