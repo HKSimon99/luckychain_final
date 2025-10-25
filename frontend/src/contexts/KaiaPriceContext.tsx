@@ -38,13 +38,10 @@ export function KaiaPriceProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // 초기 로드
+    // 고정 환율 사용 - API 호출 불필요
     fetchPrice();
-
-    // 30초마다 자동 업데이트 (과도한 호출 방지)
-    const interval = setInterval(fetchPrice, 30000);
-
-    return () => clearInterval(interval);
+    
+    // interval 제거 - 고정값이므로 업데이트 불필요
   }, []);
 
   return (

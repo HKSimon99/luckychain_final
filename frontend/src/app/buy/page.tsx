@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ethers } from 'ethers';
-import MobileLayout from '@/components/MobileLayout';
-import Header from '@/components/Header';
-import * as lottoAbiModule from '@/lib/lottoAbi.json';
+import { useAccount } from 'wagmi';
 import { useKaiaPrice } from '@/contexts/KaiaPriceContext';
+import MobileLayout from '@/components/MobileLayout';
+import MobileStatusBar from '@/components/MobileStatusBar';
+import * as lottoAbiModule from '@/lib/lottoAbi.json';
 
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
@@ -18,50 +19,170 @@ interface TicketSet {
 
 export default function BuyTicketPage() {
   const router = useRouter();
-  const { kaiaPrice } = useKaiaPrice(); // KAIA 실시간 가격
+  const { address, isConnected } = useAccount();
+  const { kaiaPrice } = useKaiaPrice();
+  
+  const [step, setStep] = useState<'select' | 'numbers'>('select'); // 단계: 선택 or 번호입력
+  const [quantity, setQuantity] = useState(1);
+  const [mode, setMode] = useState<'자동' | '수동'>('자동');
   const [ticketSets, setTicketSets] = useState<TicketSet[]>([{ id: 1, numbers: [] }]);
   const [currentSetId, setCurrentSetId] = useState(1);
-  const [ticketPrice, setTicketPrice] = useState('0.01');
-  const [address, setAddress] = useState('');
-  const [balance, setBalance] = useState('0');
+  const [ticketPrice, setTicketPrice] = useState('10');
   const [isLoading, setIsLoading] = useState(false);
-  const [purchaseCount, setPurchaseCount] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
 
-  // 지갑 연결 확인 및 티켓 가격 로드
+  // 티켓 가격 조회
   useEffect(() => {
-    const init = async () => {
-      if (typeof window.ethereum !== 'undefined') {
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts.length > 0) {
-            setAddress(accounts[0]);
-
-            // 잔액 조회
-            const balanceHex = await window.ethereum.request({
-              method: 'eth_getBalance',
-              params: [accounts[0], 'latest'],
-            });
-            setBalance((parseInt(balanceHex, 16) / 1e18).toFixed(4));
-
-            // 티켓 가격 조회
-            const provider = new ethers.JsonRpcProvider('https://public-en-kairos.node.kaia.io');
-            const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
-            const price = await contract.ticketPrice();
-            setTicketPrice(ethers.formatEther(price));
-          }
-        } catch (error) {
-          console.error('초기화 실패:', error);
-        }
+    const fetchPrice = async () => {
+      try {
+        const provider = new ethers.JsonRpcProvider('https://public-en-kairos.node.kaia.io');
+        const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
+        const price = await contract.ticketPrice();
+        setTicketPrice(ethers.formatEther(price));
+      } catch (error) {
+        console.error('가격 조회 실패:', error);
       }
     };
-
-    init();
+    fetchPrice();
   }, []);
 
-  // 현재 세트 가져오기
-  const getCurrentSet = () => ticketSets.find((set) => set.id === currentSetId);
-  const selectedNumbers = getCurrentSet()?.numbers || [];
+  // 수량 조절 (제한 없음)
+  const increase = () => setQuantity(prev => prev + 1);
+  const decrease = () => setQuantity(prev => (prev > 1 ? prev - 1 : prev));
+  const setQuick = (num: number) => setQuantity(num);
+  const reset = () => setQuantity(1);
+  const handleQuantityInput = (value: string) => {
+    const num = parseInt(value);
+    if (!isNaN(num) && num >= 1) {
+      setQuantity(num);
+    }
+  };
+
+  // 자동 번호 생성
+  const generateAutoNumbers = (): number[] => {
+    const numbers: number[] = [];
+    while (numbers.length < 6) {
+      const random = Math.floor(Math.random() * 45) + 1;
+      if (!numbers.includes(random)) {
+        numbers.push(random);
+      }
+    }
+    return numbers.sort((a, b) => a - b);
+  };
+
+  // 구매 처리
+  const handlePurchase = async (sets: TicketSet[]) => {
+    if (!isConnected || !address) {
+      alert('지갑을 먼저 연결해주세요!');
+      router.push('/wallet');
+      return;
+    }
+
+    // 모든 세트가 6개의 번호를 가지고 있는지 검증
+    const incompleteSets = sets.filter(set => set.numbers.length !== 6);
+    if (incompleteSets.length > 0) {
+      alert(`모든 티켓에 6개의 번호를 선택해주세요! (미완성: ${incompleteSets.length}개)`);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
+
+      // 번호 배열 생성 및 검증 (uint8[6][] 형식으로 변환)
+      const numbersArray = sets.map(set => {
+        // 각 번호가 1-45 범위인지 확인
+        const validNumbers = set.numbers.filter(n => n >= 1 && n <= 45);
+        if (validNumbers.length !== 6) {
+          throw new Error('잘못된 번호가 포함되어 있습니다.');
+        }
+        // uint8 배열로 명시적 변환 (정확히 6개)
+        return validNumbers.slice(0, 6).map(n => Math.floor(n));
+      });
+
+      const totalCost = ethers.parseEther((parseFloat(ticketPrice) * sets.length).toString());
+
+      console.log('🎫 티켓 구매 시작:');
+      console.log('  - 수량:', sets.length);
+      console.log('  - 번호 배열:', JSON.stringify(numbersArray));
+      console.log('  - 각 티켓:', numbersArray.map((nums, i) => `${i+1}번: [${nums.join(', ')}]`));
+      console.log('  - 총 비용:', ethers.formatEther(totalCost), 'KAIA');
+
+      // 컨트랙트 호출 전 최종 검증
+      if (numbersArray.length === 0) {
+        throw new Error('티켓이 없습니다.');
+      }
+      
+      for (let i = 0; i < numbersArray.length; i++) {
+        if (!Array.isArray(numbersArray[i]) || numbersArray[i].length !== 6) {
+          throw new Error(`${i+1}번째 티켓의 번호가 올바르지 않습니다.`);
+        }
+        for (let j = 0; j < numbersArray[i].length; j++) {
+          if (typeof numbersArray[i][j] !== 'number' || numbersArray[i][j] < 1 || numbersArray[i][j] > 45) {
+            throw new Error(`${i+1}번째 티켓의 ${j+1}번째 번호가 올바르지 않습니다: ${numbersArray[i][j]}`);
+          }
+        }
+      }
+
+      console.log('✅ 검증 통과! 트랜잭션 전송 중...');
+
+      // tokenURIs 배열 생성 (빈 문자열 배열)
+      const tokenURIs = new Array(numbersArray.length).fill('');
+
+      console.log('📝 TokenURIs:', tokenURIs);
+
+      const tx = await contract.buyTicketBatch(numbersArray, tokenURIs, {
+        value: totalCost,
+        gasLimit: 500000n * BigInt(sets.length),
+      });
+
+      console.log('⏳ 트랜잭션 대기 중...', tx.hash);
+      const receipt = await tx.wait();
+      
+      console.log('✅ 구매 완료!');
+      
+      // 최근 구매한 티켓의 트랜잭션 해시 저장
+      if (receipt && receipt.hash) {
+        sessionStorage.setItem('recentPurchaseTxHash', receipt.hash);
+        console.log('💾 트랜잭션 해시 저장:', receipt.hash);
+      }
+      
+      alert('🎉 복권 구매 완료!');
+      router.push('/fortune');
+    } catch (error: any) {
+      console.error('❌ 구매 실패:', error);
+      alert(`구매 실패: ${error.message || '알 수 없는 오류'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 다음 단계 처리
+  const handleNext = () => {
+    if (mode === '자동') {
+      // 자동 모드: 즉시 티켓 생성 및 구매
+      const newSets: TicketSet[] = [];
+      for (let i = 0; i < quantity; i++) {
+        newSets.push({
+          id: i + 1,
+          numbers: generateAutoNumbers(),
+        });
+      }
+      setTicketSets(newSets);
+      handlePurchase(newSets);
+    } else {
+      // 수동 모드: 번호 선택 화면으로 전환
+      const newSets: TicketSet[] = [];
+      for (let i = 0; i < quantity; i++) {
+        newSets.push({ id: i + 1, numbers: [] });
+      }
+      setTicketSets(newSets);
+      setCurrentSetId(1);
+      setStep('numbers');
+    }
+  };
 
   // 번호 선택/해제
   const toggleNumber = (number: number) => {
@@ -79,893 +200,507 @@ export default function BuyTicketPage() {
     );
   };
 
-  // 자동 선택 (현재 세트)
-  const autoSelect = () => {
-    const numbers: number[] = [];
-    while (numbers.length < 6) {
-      const random = Math.floor(Math.random() * 45) + 1;
-      if (!numbers.includes(random)) {
-        numbers.push(random);
-      }
-    }
-    setTicketSets((prev) =>
-      prev.map((set) => (set.id === currentSetId ? { ...set, numbers: numbers.sort((a, b) => a - b) } : set))
-    );
-  };
-
-  // 자동 선택 (여러 장)
-  const autoSelectMultiple = (count: number) => {
-    const newSets: TicketSet[] = [];
-    for (let i = 0; i < count; i++) {
-      const numbers: number[] = [];
-      while (numbers.length < 6) {
-        const random = Math.floor(Math.random() * 45) + 1;
-        if (!numbers.includes(random)) {
-          numbers.push(random);
-        }
-      }
-      newSets.push({ id: ticketSets.length + i + 1, numbers: numbers.sort((a, b) => a - b) });
-    }
-    setTicketSets([...ticketSets, ...newSets]);
-    setCurrentSetId(newSets[newSets.length - 1].id);
-  };
-
-  // 세트 추가
-  const addSet = () => {
-    const newId = Math.max(...ticketSets.map((s) => s.id)) + 1;
-    setTicketSets([...ticketSets, { id: newId, numbers: [] }]);
-    setCurrentSetId(newId);
-  };
-
-  // 세트 삭제
-  const removeSet = (id: number) => {
-    if (ticketSets.length === 1) {
-      alert('최소 1장은 있어야 합니다!');
-      return;
-    }
-    setTicketSets((prev) => prev.filter((set) => set.id !== id));
-    if (currentSetId === id) {
-      setCurrentSetId(ticketSets[0].id);
-    }
-  };
-
-  // 초기화
-  const clearSelection = () => {
-    setTicketSets([{ id: 1, numbers: [] }]);
-    setCurrentSetId(1);
-  };
-
-  // 지갑 연결
-  const connectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      alert('MetaMask를 설치해주세요!');
+  // 수동 모드에서 다음/구매
+  const handleManualNext = () => {
+    const currentSet = ticketSets.find(set => set.id === currentSetId);
+    if (!currentSet || currentSet.numbers.length < 6) {
+      alert('6개의 번호를 모두 선택해주세요!');
       return;
     }
 
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      setAddress(accounts[0]);
-
-      const balanceHex = await window.ethereum.request({
-        method: 'eth_getBalance',
-        params: [accounts[0], 'latest'],
-      });
-      setBalance((parseInt(balanceHex, 16) / 1e18).toFixed(4));
-
-      // 티켓 가격 조회
-      const provider = new ethers.JsonRpcProvider('https://public-en-kairos.node.kaia.io');
-      const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
-      const price = await contract.ticketPrice();
-      setTicketPrice(ethers.formatEther(price));
-    } catch (error) {
-      console.error('지갑 연결 실패:', error);
-      alert('지갑 연결에 실패했습니다.');
+    if (currentSetId < quantity) {
+      setCurrentSetId(currentSetId + 1);
+    } else {
+      handlePurchase(ticketSets);
     }
   };
 
-  // 구매하기
-  const handleBuy = async () => {
-    // 완성된 티켓만 필터링 (6개 번호를 모두 선택한 티켓)
-    const completedTickets = ticketSets.filter((set) => set.numbers.length === 6);
-    
-    if (completedTickets.length === 0) {
-      alert('구매할 티켓이 없습니다!\n최소 1개 티켓의 번호(6개)를 선택해주세요.');
-      return;
-    }
-
-    // 미완성 티켓이 있으면 알림
-    const incompleteCount = ticketSets.length - completedTickets.length;
-    if (incompleteCount > 0) {
-      const confirm = window.confirm(
-        `완성된 티켓 ${completedTickets.length}개만 구매합니다.\n(미완성 ${incompleteCount}개는 제외)\n\n계속하시겠습니까?`
-      );
-      if (!confirm) return;
-    }
-
-    if (!address) {
-      alert('지갑을 먼저 연결해주세요!');
-      await connectWallet();
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setPurchaseCount(0);
-      setTotalCount(completedTickets.length);
-
-      console.log('🎫 티켓 구매 시작...');
-      console.log('- 구매 장수:', completedTickets.length);
-      console.log('- 지갑 주소:', address);
-
-      // 읽기용 Provider (일반 RPC - 안정적)
-      const readProvider = new ethers.JsonRpcProvider('https://public-en-kairos.node.kaia.io');
-      const readContract = new ethers.Contract(contractAddress, lottoAbi, readProvider);
-
-      // 회차 확인 (안정적인 RPC로)
-      let currentDrawId;
-      let draw;
-      
-      try {
-        console.log('📋 회차 정보 확인 중...');
-        currentDrawId = await readContract.currentDrawId();
-        draw = await readContract.draws(currentDrawId);
-        console.log('✅ 회차 확인 성공:', currentDrawId.toString());
-        console.log('📋 현재 회차:', currentDrawId.toString());
-        console.log('📋 판매 가능:', draw.isOpenForSale);
-        
-        if (!draw.isOpenForSale) {
-          alert('❌ 현재 판매 중인 회차가 없습니다!\n\n관리자에게 문의하여 회차를 생성하고 판매를 시작해주세요.');
-          setIsLoading(false);
-          return;
-        }
-      } catch (error: any) {
-        console.error('❌ 회차 확인 실패:', error);
-        alert('❌ 회차 정보를 확인할 수 없습니다!\n\n관리자에게 문의해주세요.');
-        setIsLoading(false);
-        return;
-      }
-
-      // 쓰기용 Provider (MetaMask - 트랜잭션 전송용)
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await browserProvider.getSigner();
-
-      // 잔액 확인
-      const balance = await browserProvider.getBalance(address);
-      const totalPriceWei = ethers.parseEther(ticketPrice) * BigInt(completedTickets.length);
-      const totalPrice = (parseFloat(ticketPrice) * completedTickets.length).toFixed(4);
-
-      if (balance < totalPriceWei) {
-        alert(
-          `❌ 잔액이 부족합니다!\n필요: ${totalPrice} KAIA (${completedTickets.length}장)\n현재: ${ethers.formatEther(balance)} KAIA`
-        );
-        setIsLoading(false);
-        return;
-      }
-
-      // 트랜잭션용 컨트랙트 (signer 연결)
-      const contract = new ethers.Contract(contractAddress, lottoAbi, signer);
-
-      console.log('🎫 buyTicketBatch로 일괄 구매 중... (총 ' + completedTickets.length + '장)');
-
-      // numbersArray와 tokenURIs 준비 (완성된 티켓만)
-      const numbersArray = completedTickets.map(set => set.numbers);
-      const tokenURIs = completedTickets.map((_, i) => `ipfs://luckychain-ticket-${Date.now()}-${i}`);
-
-      console.log('📦 번호 배열:', numbersArray);
-      console.log('🏷️ URI 배열:', tokenURIs);
-
-      // 한 번의 트랜잭션으로 모든 티켓 구매!
-      const tx = await contract.buyTicketBatch(
-        numbersArray,
-        tokenURIs,
-        {
-          value: totalPriceWei,
-          gasLimit: 500000n + (BigInt(completedTickets.length) * 300000n), // 티켓 수에 비례한 가스 설정
-        }
-      );
-
-      console.log('✅ 트랜잭션 전송 완료:', tx.hash);
-      
-      alert(
-        `📤 트랜잭션 전송 완료!\n\nHash: ${tx.hash.slice(0, 10)}...\n\n블록체인에서 확인 중입니다...\n잠시만 기다려주세요.`
-      );
-
-      // 트랜잭션 확정 대기
-      console.log('⏳ 트랜잭션 확정 대기 중...');
-      const receipt = await tx.wait();
-      
-      console.log('✅ 트랜잭션 확정 완료:', receipt);
-
-      alert(
-        `✅ 티켓 ${completedTickets.length}장 구매 완료! 🎉\n\n총 비용: ${totalPrice} KAIA\n\n한 번의 트랜잭션으로 완료!\n마이페이지에서 확인하세요!`
-      );
-
-      // 포춘쿠키 페이지로 이동
-      router.push('/fortune');
-    } catch (error: any) {
-      console.error('❌ 티켓 구매 실패:', error);
-
-      let errorMessage = '티켓 구매에 실패했습니다.';
-
-      if (error.code === 'ACTION_REJECTED') {
-        errorMessage = '사용자가 트랜잭션을 거부했습니다.';
-      } else if (error.message?.includes('insufficient funds')) {
-        errorMessage = '잔액이 부족합니다. KAIA를 충전해주세요.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      alert(`❌ 오류 발생\n\n${errorMessage}`);
-    } finally {
-      setIsLoading(false);
-      setPurchaseCount(0);
-      setTotalCount(0);
-    }
-  };
-
-  // 번호 색상 (로또 스타일)
-  const getNumberColor = (num: number) => {
-    if (num <= 10) return '#FFC107'; // 노란색
-    if (num <= 20) return '#2196F3'; // 파란색
-    if (num <= 30) return '#F44336'; // 빨간색
-    if (num <= 40) return '#9E9E9E'; // 회색
-    return '#4CAF50'; // 초록색
-  };
-
-  // 지갑 연결되지 않은 경우
-  if (!address) {
-    return (
-      <MobileLayout showBottomNav={false}>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            padding: 'clamp(20px, 5vw, 30px)',
-          }}
-        >
-          <h2
-            style={{
-              fontSize: 'clamp(20px, 5vw, 24px)',
-              fontWeight: '700',
-              color: 'white',
-              marginBottom: 'clamp(15px, 4vw, 20px)',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            지갑을 먼저 연결해주세요
-          </h2>
-          <button
-            onClick={connectWallet}
-            style={{
-              padding: 'clamp(12px, 3vw, 15px) clamp(30px, 7vw, 40px)',
-              background: 'linear-gradient(135deg, #93EE00 0%, #7BC800 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'clamp(10px, 3vw, 12px)',
-              fontSize: 'clamp(14px, 3.5vw, 16px)',
-              fontWeight: '600',
-              cursor: 'pointer',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            🦊 지갑 연결
-          </button>
-        </div>
-      </MobileLayout>
-    );
-  }
+  const getCurrentSet = () => ticketSets.find((set) => set.id === currentSetId);
+  const selectedNumbers = getCurrentSet()?.numbers || [];
 
   return (
     <MobileLayout>
-      <Header />
-
-      {/* 지갑 정보 바 */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #6B46C1 0%, #9333EA 100%)',
-          padding: 'clamp(10px, 3vw, 12px) clamp(15px, 4vw, 20px)',
-          color: 'white',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: '85px',
+          background: '#380D44',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: 'column',
+          overflow: 'hidden',
         }}
       >
-        <div>
-          <div
-            style={{
-              fontSize: 'clamp(10px, 2.5vw, 12px)',
-              opacity: 0.8,
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            내 지갑
-          </div>
-          <div
-            style={{
-              fontSize: 'clamp(12px, 3vw, 14px)',
-              fontWeight: '600',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            {address.slice(0, 6)}...{address.slice(-4)}
-          </div>
+      {/* 상단 상태바 */}
+      <MobileStatusBar />
+
+      {/* 뒤로가기 + 제목 */}
+      <div
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2vh 0',
+          position: 'relative',
+        }}
+      >
+        <div
+          onClick={() => router.push('/')}
+          style={{
+            position: 'absolute',
+            left: '4vw',
+            cursor: 'pointer',
+            fontSize: 'clamp(18px, 4.5vw, 22px)',
+            color: 'white',
+          }}
+        >
+          ←
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div
-            style={{
-              fontSize: 'clamp(10px, 2.5vw, 12px)',
-              opacity: 0.8,
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            잔액
-          </div>
-          <div
-            style={{
-              fontSize: 'clamp(14px, 3.5vw, 16px)',
-              fontWeight: '700',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            {balance} KAIA
-          </div>
-        </div>
+        <span style={{ color: 'white', fontSize: 'clamp(14px, 3.5vw, 15px)', fontWeight: 700 }}>
+          복권 사기
+        </span>
       </div>
 
-      {/* 메인 콘텐츠 */}
-      <div
-        style={{
-          flex: 1,
-          padding: 'clamp(15px, 4vw, 20px)',
-          overflow: 'auto',
-        }}
-      >
-        {/* 세트 개수 및 빠른 추가 */}
+      {/* 선택 모드 (기본 화면) */}
+      {step === 'select' && (
         <div
           style={{
-            background: 'white',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(15px, 4vw, 20px)',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-evenly',
+            padding: '0 4vw',
+            overflow: 'hidden',
           }}
         >
+          {/* 카이아 코인 설명 박스 */}
           <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 'clamp(12px, 3vw, 15px)',
-            }}
-          >
-            <h3
-              style={{
-                fontSize: 'clamp(16px, 4vw, 18px)',
-                fontWeight: '600',
-                color: '#333',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              🎫 티켓 {ticketSets.length}장
-            </h3>
-            <button
-              onClick={addSet}
-              style={{
-                padding: 'clamp(6px, 2vw, 8px) clamp(12px, 3vw, 15px)',
-                background: '#4CAF50',
-                color: 'white',
-                border: 'none',
-                borderRadius: 'clamp(8px, 2vw, 10px)',
-                fontSize: 'clamp(12px, 3vw, 14px)',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              + 1장 추가
-            </button>
-          </div>
-
-          {/* 자동 선택 버튼 그룹 */}
-          <div style={{ display: 'flex', gap: 'clamp(6px, 2vw, 8px)', flexWrap: 'wrap' }}>
-            {[5, 10, 20, 50].map((count) => (
-              <button
-                key={count}
-                onClick={() => autoSelectMultiple(count)}
-                style={{
-                  flex: 1,
-                  minWidth: 'clamp(60px, 15vw, 80px)',
-                  padding: 'clamp(8px, 2vw, 10px)',
-                  background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 'clamp(8px, 2vw, 10px)',
-                  fontSize: 'clamp(11px, 3vw, 13px)',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                🎲 {count}장 자동
-              </button>
-            ))}
-          </div>
-
-          {/* 전체 초기화 */}
-          <button
-            onClick={clearSelection}
             style={{
               width: '100%',
-              marginTop: 'clamp(10px, 3vw, 12px)',
-              padding: 'clamp(8px, 2vw, 10px)',
-              background: '#F44336',
+              background: '#685584',
+              borderRadius: '2vw',
+              padding: '1.8vh 3vw',
               color: 'white',
-              border: 'none',
-              borderRadius: 'clamp(8px, 2vw, 10px)',
-              fontSize: 'clamp(12px, 3vw, 14px)',
-              fontWeight: '600',
-              cursor: 'pointer',
-              fontFamily: 'SF Pro, Arial, sans-serif',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
             }}
           >
-            🗑️ 전체 초기화
-          </button>
-        </div>
+            <div style={{ fontSize: 'clamp(12px, 3vw, 13px)', fontWeight: 500, marginBottom: '0.8vh' }}>
+              💡 카이아(KAIA) 코인이란?
+            </div>
+            <div style={{ fontSize: 'clamp(9px, 2.3vw, 10px)', fontWeight: 300, lineHeight: '1.6' }}>
+              카이아 블록체인 기반 디지털 자산으로 안전하고 빠른 거래를 지원합니다. 
+              복권 1장당 {ticketPrice} KAIA로 구매할 수 있으며, 시장 상황에 따라 가치가 변동될 수 있습니다다.
+            </div>
+          </div>
 
-        {/* 세트 목록 */}
-        <div
-          style={{
-            background: 'white',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(15px, 4vw, 20px)',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
-            maxHeight: 'clamp(200px, 35vh, 250px)',
-            overflow: 'auto',
-          }}
-        >
-          <h3
+          {/* 구매 개수 박스 */}
+          <div
             style={{
-              fontSize: 'clamp(14px, 3.5vw, 16px)',
-              fontWeight: '600',
-              color: '#333',
-              marginBottom: 'clamp(10px, 3vw, 12px)',
-              fontFamily: 'SF Pro, Arial, sans-serif',
+              width: '100%',
+              background: 'linear-gradient(330deg, #87056D 0%, #55036b 64%)',
+              border: '1px solid rgba(255,255,255,0.5)',
+              borderRadius: '3vw',
+              padding: '2vh 4vw',
+              color: 'white',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
             }}
           >
-            티켓 목록
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(8px, 2vw, 10px)' }}>
-            {ticketSets.map((set) => (
-              <div
-                key={set.id}
-                onClick={() => setCurrentSetId(set.id)}
+            {/* 제목 */}
+            <div style={{ 
+              fontSize: 'clamp(13px, 3.3vw, 14px)', 
+              fontWeight: 700, 
+              textAlign: 'center', 
+              marginBottom: '1.5vh',
+            }}>
+              구매 개수
+              <br />
+              <span style={{ fontSize: 'clamp(9px, 2.3vw, 10px)', fontWeight: 350 }}>
+                (원하는 만큼 구매 가능)
+              </span>
+            </div>
+
+            {/* - [숫자 입력] + */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'rgba(255,255,255,0.2)',
+                borderRadius: '2vw',
+                padding: '1.2vh 4vw',
+                width: '100%',
+                marginBottom: '1.5vh',
+              }}
+            >
+              <button
+                onClick={decrease}
                 style={{
-                  padding: 'clamp(10px, 3vw, 12px)',
-                  background: currentSetId === set.id ? '#E3F2FD' : '#F9F9F9',
-                  border: `2px solid ${currentSetId === set.id ? '#2196F3' : '#E0E0E0'}`,
-                  borderRadius: 'clamp(8px, 2vw, 10px)',
+                  width: '6vw',
+                  height: '6vw',
+                  borderRadius: '50%',
+                  background: '#ede3e3',
+                  border: 'none',
+                  color: '#000',
+                  fontWeight: 700,
                   cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  fontSize: 'clamp(14px, 3.5vw, 16px)',
                 }}
               >
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: 'clamp(11px, 3vw, 13px)',
-                      color: '#666',
-                      marginBottom: 'clamp(4px, 1vw, 5px)',
-                      fontFamily: 'SF Pro, Arial, sans-serif',
-                    }}
-                  >
-                    티켓 #{set.id}
-                  </div>
-                  <div style={{ display: 'flex', gap: 'clamp(4px, 1vw, 5px)', flexWrap: 'wrap' }}>
-                    {set.numbers.length > 0 ? (
-                      set.numbers.map((num, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            width: 'clamp(24px, 6vw, 28px)',
-                            height: 'clamp(24px, 6vw, 28px)',
-                            borderRadius: '50%',
-                            background: getNumberColor(num),
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 'clamp(10px, 2.5vw, 12px)',
-                            fontWeight: '700',
-                            fontFamily: 'SF Pro, Arial, sans-serif',
-                          }}
-                        >
-                          {num}
-                        </span>
-                      ))
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: 'clamp(11px, 3vw, 13px)',
-                          color: '#999',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        번호를 선택해주세요
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {ticketSets.length > 1 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeSet(set.id);
-                    }}
-                    style={{
-                      width: 'clamp(28px, 7vw, 32px)',
-                      height: 'clamp(28px, 7vw, 32px)',
-                      background: '#F44336',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '50%',
-                      fontSize: 'clamp(14px, 3.5vw, 16px)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+                -
+              </button>
+              
+              {/* 숫자 직접 입력 가능 */}
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => handleQuantityInput(e.target.value)}
+                min="1"
+                style={{ 
+                  width: '15vw', 
+                  textAlign: 'center', 
+                  fontSize: 'clamp(15px, 3.8vw, 16px)', 
+                  fontWeight: 600,
+                  background: 'rgba(255,255,255,0.3)',
+                  border: '1px solid rgba(255,255,255,0.5)',
+                  borderRadius: '1.5vw',
+                  color: 'white',
+                  padding: '1vh',
+                }}
+              />
+              
+              <button
+                onClick={increase}
+                style={{
+                  width: '6vw',
+                  height: '6vw',
+                  borderRadius: '50%',
+                  background: '#fff',
+                  border: 'none',
+                  color: '#000',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: 'clamp(14px, 3.5vw, 16px)',
+                }}
+              >
+                +
+              </button>
+            </div>
 
-        {/* 현재 세트 번호 선택 */}
+            {/* 빠른 선택 버튼 (Radio 스크롤) */}
+            <div style={{ 
+              display: 'flex', 
+              overflowX: 'auto', 
+              gap: '2vw',
+              width: '100%', 
+              marginBottom: '1.5vh',
+              paddingBottom: '0.5vh',
+            }}>
+              {[1, 5, 10, 20, 30, 50, 100].map((num) => (
+                <button
+                  key={num}
+                  onClick={() => setQuick(num)}
+                  style={{
+                    minWidth: '15vw',
+                    padding: '1.2vh 3vw',
+                    borderRadius: '1.5vw',
+                    background: quantity === num
+                      ? 'linear-gradient(135deg, #C453F5 0%, #FF00B7 100%)'
+                      : 'rgba(255, 255, 255, 0.2)',
+                    border: quantity === num ? '2px solid #FF00B7' : 'none',
+                    color: '#fff',
+                    fontSize: 'clamp(11px, 2.8vw, 12px)',
+                    fontWeight: quantity === num ? '700' : '400',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {num} 장
+                </button>
+              ))}
+            </div>
+
+            {/* 흰색 선 */}
+            <div style={{ width: '100%', height: '1px', background: 'rgba(255,255,255,0.5)', margin: '1vh 0' }}></div>
+
+            {/* 티켓 가격 */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                width: '100%',
+                fontSize: 'clamp(12px, 3vw, 13px)',
+                fontWeight: 600,
+                color: '#FFD900',
+                marginTop: '0.5vh',
+              }}
+            >
+              <span>티켓 가격</span>
+              <span>{(quantity * parseFloat(ticketPrice)).toFixed(1)} KAIA</span>
+            </div>
+          </div>
+
+          {/* 구매 방식 박스 */}
+          <div
+            style={{
+              width: '100%',
+              background: 'linear-gradient(330deg, #87056D 0%, #55036b 64%)',
+              border: '1px solid rgba(255,255,255,0.5)',
+              borderRadius: '3vw',
+              padding: '2vh 4vw',
+              color: 'white',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+          >
+            <div style={{ 
+              fontSize: 'clamp(13px, 3.3vw, 14px)', 
+              fontWeight: 700, 
+              textAlign: 'center', 
+              marginBottom: '1.5vh',
+            }}>
+              구매 방식
+            </div>
+
+            {/* 자동 / 수동 */}
+            <div style={{ display: 'flex', width: '100%', gap: '4vw', marginBottom: '1.5vh' }}>
+              {(['자동', '수동'] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setMode(type)}
+                  style={{
+                    flex: 1,
+                    height: '4.5vh',
+                    borderRadius: '1.5vw',
+                    border: 'none',
+                    background:
+                      mode === type
+                        ? 'linear-gradient(135deg, #C453F5 0%, #FF00B7 100%)'
+                        : 'rgba(255,255,255,0.2)',
+                    color: '#fff',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontSize: 'clamp(13px, 3.3vw, 14px)',
+                  }}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+
+            {/* 설명 박스 */}
+            <div
+              style={{
+                width: '100%',
+                background: 'rgba(88, 92, 138, 0.51)',
+                color: '#fff',
+                fontWeight: 300,
+                textAlign: 'center',
+                borderRadius: '1.5vw',
+                padding: '1.2vh 3vw',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                fontSize: 'clamp(8px, 2vw, 9px)',
+                lineHeight: '1.4',
+              }}
+            >
+              {mode === '자동'
+                ? '포춘쿠키를 통해 행운의 메시지와 함께 번호가 생성됩니다'
+                : '1 ~ 45 중 6개의 번호를 직접 선택할 수 있습니다'}
+            </div>
+          </div>
+
+          {/* 다음 버튼 */}
+          <button
+            onClick={handleNext}
+            disabled={isLoading}
+            style={{
+              width: '100%',
+              padding: '2.2vh 0',
+              background: isLoading 
+                ? '#666' 
+                : 'linear-gradient(135deg, #93EE00 0%, #7BC800 100%)',
+              color: '#000',
+              fontSize: 'clamp(14px, 3.5vw, 16px)',
+              fontWeight: 700,
+              border: 'none',
+              borderRadius: '2vw',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isLoading ? '처리 중...' : mode === '자동' ? '🎲 자동 구매하기' : '✏️ 번호 선택하기'}
+          </button>
+
+        </div>
+      )}
+
+      {/* 수동 모드 - 번호 선택 화면 */}
+      {step === 'numbers' && mode === '수동' && (
         <div
           style={{
-            background: 'white',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(20px, 5vw, 25px)',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '0 4vw',
+            paddingTop: '2vh',
+            paddingBottom: '2vh',
+            overflow: 'hidden',
           }}
         >
-          <div
+          {/* 뒤로가기 버튼 */}
+          <button
+            onClick={() => setStep('select')}
             style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 'clamp(12px, 3vw, 15px)',
+              alignSelf: 'flex-start',
+              padding: '1vh 3vw',
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '1.5vw',
+              fontSize: 'clamp(11px, 2.8vw, 12px)',
+              cursor: 'pointer',
+              marginBottom: '2vh',
             }}
           >
-            <h3
-              style={{
-                fontSize: 'clamp(16px, 4vw, 18px)',
-                fontWeight: '600',
-                color: '#333',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              티켓 #{currentSetId} ({selectedNumbers.length}/6)
-            </h3>
-            <button
-              onClick={autoSelect}
-              style={{
-                padding: 'clamp(6px, 2vw, 8px) clamp(12px, 3vw, 15px)',
-                background: '#2196F3',
-                color: 'white',
-                border: 'none',
-                borderRadius: 'clamp(8px, 2vw, 10px)',
-                fontSize: 'clamp(12px, 3vw, 14px)',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              🎲 자동
-            </button>
-          </div>
+            ← 뒤로가기
+          </button>
 
+          {/* 번호 선택 박스 */}
           <div
             style={{
+              width: '100%',
+              flex: 1,
+              background: 'linear-gradient(330deg, #87056D 0%, #55036b 64%)',
+              border: '1px solid rgba(255,255,255,0.5)',
+              borderRadius: '3vw',
+              padding: '2.5vh 4vw',
+              color: 'white',
               display: 'flex',
-              justifyContent: 'center',
-              gap: 'clamp(8px, 2vw, 10px)',
-              marginBottom: 'clamp(15px, 4vw, 20px)',
-              flexWrap: 'wrap',
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
           >
-            {Array.from({ length: 6 }).map((_, index) => {
-              const num = selectedNumbers[index];
-              return (
-                <div
-                  key={index}
+            {/* 진행 상황 */}
+            <div style={{ 
+              fontSize: 'clamp(12px, 3vw, 13px)', 
+              fontWeight: 600, 
+              textAlign: 'center', 
+              marginBottom: '2vh',
+              color: '#FFD900',
+            }}>
+              {currentSetId} / {quantity} 세트
+            </div>
+
+            {/* 선택된 번호 표시 */}
+            <div style={{ 
+              fontSize: 'clamp(11px, 2.8vw, 12px)', 
+              marginBottom: '2vh',
+              textAlign: 'center',
+              padding: '1.5vh 3vw',
+              background: 'rgba(255,255,255,0.1)',
+              borderRadius: '1.5vw',
+            }}>
+              선택된 번호: {selectedNumbers.length > 0 ? selectedNumbers.join(', ') : '없음'}
+            </div>
+
+            {/* 번호 그리드 (1-45) */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(9, 1fr)',
+                gap: '1.5vw',
+                marginBottom: '2vh',
+                flex: 1,
+                alignContent: 'start',
+              }}
+            >
+              {Array.from({ length: 45 }, (_, i) => i + 1).map((num) => (
+                <button
+                  key={num}
+                  onClick={() => toggleNumber(num)}
                   style={{
-                    width: 'clamp(45px, 11vw, 55px)',
-                    height: 'clamp(45px, 11vw, 55px)',
+                    aspectRatio: '1',
                     borderRadius: '50%',
+                    background: selectedNumbers.includes(num)
+                      ? 'linear-gradient(135deg, #C453F5 0%, #FF00B7 100%)'
+                      : 'rgba(255,255,255,0.2)',
+                    color: '#fff',
+                    border: 'none',
+                    fontSize: 'clamp(10px, 2.5vw, 11px)',
+                    fontWeight: selectedNumbers.includes(num) ? 700 : 400,
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 'clamp(18px, 5vw, 22px)',
-                    fontWeight: '700',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                    background: num ? getNumberColor(num) : '#E0E0E0',
-                    color: num ? 'white' : '#9E9E9E',
-                    boxShadow: num ? '0 3px 10px rgba(0,0,0,0.2)' : 'none',
                   }}
                 >
-                  {num || '?'}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 버튼 그룹 */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 'clamp(8px, 2vw, 10px)',
-            }}
-          >
-            <button
-              onClick={autoSelect}
-              style={{
-                flex: 1,
-                padding: 'clamp(10px, 3vw, 12px)',
-                background: '#2196F3',
-                color: 'white',
-                border: 'none',
-                borderRadius: 'clamp(8px, 2vw, 10px)',
-                fontSize: 'clamp(13px, 3.5vw, 15px)',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              🎲 자동 선택
-            </button>
-            <button
-              onClick={clearSelection}
-              style={{
-                flex: 1,
-                padding: 'clamp(10px, 3vw, 12px)',
-                background: '#F44336',
-                color: 'white',
-                border: 'none',
-                borderRadius: 'clamp(8px, 2vw, 10px)',
-                fontSize: 'clamp(13px, 3.5vw, 15px)',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              🗑️ 초기화
-            </button>
-          </div>
-        </div>
-
-        {/* 번호 선택 그리드 */}
-        <div
-          style={{
-            background: 'white',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(15px, 4vw, 20px)',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
-          }}
-        >
-          <h3
-            style={{
-              fontSize: 'clamp(16px, 4vw, 18px)',
-              fontWeight: '600',
-              color: '#333',
-              marginBottom: 'clamp(12px, 3vw, 15px)',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            번호를 선택하세요 (1-45)
-          </h3>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(40px, 10vw, 50px), 1fr))',
-              gap: 'clamp(6px, 2vw, 8px)',
-            }}
-          >
-            {Array.from({ length: 45 }, (_, i) => i + 1).map((number) => {
-              const isSelected = selectedNumbers.includes(number);
-              const isDisabled = !isSelected && selectedNumbers.length >= 6;
-
-              return (
-                <button
-                  key={number}
-                  onClick={() => toggleNumber(number)}
-                  disabled={isDisabled}
-                  style={{
-                    width: '100%',
-                    aspectRatio: '1',
-                    borderRadius: '50%',
-                    border: isSelected ? '3px solid #333' : '1px solid #E0E0E0',
-                    background: isSelected ? getNumberColor(number) : 'white',
-                    color: isSelected ? 'white' : '#333',
-                    fontSize: 'clamp(14px, 3.5vw, 16px)',
-                    fontWeight: isSelected ? '700' : '500',
-                    cursor: isDisabled ? 'not-allowed' : 'pointer',
-                    opacity: isDisabled ? 0.3 : 1,
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                    transition: 'all 0.2s ease',
-                    boxShadow: isSelected ? '0 3px 10px rgba(0,0,0,0.2)' : 'none',
-                  }}
-                >
-                  {number}
+                  {num}
                 </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 가격 정보 */}
-        <div
-          style={{
-            background: 'linear-gradient(135deg, #6B46C1 0%, #9333EA 100%)',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(20px, 5vw, 25px)',
-            color: 'white',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'clamp(12px, 3vw, 15px)' }}>
-            <div>
-              <div
-                style={{
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  opacity: 0.8,
-                  marginBottom: 'clamp(4px, 1vw, 5px)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                장당 가격
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(18px, 4.5vw, 20px)',
-                  fontWeight: '700',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                {ticketPrice} KAIA
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(11px, 3vw, 13px)',
-                  opacity: 0.7,
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                ≈ ₩{(parseFloat(ticketPrice) * kaiaPrice).toFixed(0)}
-              </div>
+              ))}
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div
-                style={{
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  opacity: 0.8,
-                  marginBottom: 'clamp(4px, 1vw, 5px)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                총 {ticketSets.length}장
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(22px, 5.5vw, 26px)',
-                  fontWeight: '700',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                {(parseFloat(ticketPrice) * ticketSets.length).toFixed(4)}
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(11px, 3vw, 13px)',
-                  opacity: 0.7,
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                ≈ ₩{((parseFloat(ticketPrice) * ticketSets.length * kaiaPrice).toFixed(0))}
-              </div>
-            </div>
-          </div>
 
-          {/* 진행 상태 (구매 중일 때만) */}
-          {isLoading && totalCount > 0 && (
-            <div
+            {/* 현재 세트 자동 생성 버튼 */}
+            <button
+              onClick={() => {
+                const autoNumbers = generateAutoNumbers();
+                setTicketSets((prev) =>
+                  prev.map((set) =>
+                    set.id === currentSetId ? { ...set, numbers: autoNumbers } : set
+                  )
+                );
+              }}
               style={{
-                marginTop: 'clamp(12px, 3vw, 15px)',
-                paddingTop: 'clamp(12px, 3vw, 15px)',
-                borderTop: '1px solid rgba(255,255,255,0.3)',
+                width: '100%',
+                padding: '1.5vh 0',
+                background: 'rgba(255,255,255,0.2)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '1.5vw',
+                fontSize: 'clamp(11px, 2.8vw, 12px)',
+                fontWeight: 600,
+                cursor: 'pointer',
+                marginBottom: '2vh',
               }}
             >
-              <div
-                style={{
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  marginBottom: 'clamp(6px, 2vw, 8px)',
-                  textAlign: 'center',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                구매 진행 중... {purchaseCount} / {totalCount}
-              </div>
-              <div
-                style={{
-                  width: '100%',
-                  height: 'clamp(6px, 2vw, 8px)',
-                  background: 'rgba(255,255,255,0.3)',
-                  borderRadius: 'clamp(3px, 1vw, 4px)',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    width: `${(purchaseCount / totalCount) * 100}%`,
-                    height: '100%',
-                    background: '#93EE00',
-                    transition: 'width 0.3s ease',
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
+              🎲 자동 생성
+            </button>
 
-        {/* 구매 버튼 */}
-        <button
-          onClick={handleBuy}
-          disabled={ticketSets.filter((set) => set.numbers.length === 6).length === 0 || isLoading}
-          style={{
-            width: '100%',
-            padding: 'clamp(15px, 4vw, 18px)',
-            background:
-              ticketSets.filter((set) => set.numbers.length === 6).length > 0 && !isLoading
-                ? 'linear-gradient(135deg, #93EE00 0%, #7BC800 100%)'
-                : '#E0E0E0',
-            color: ticketSets.filter((set) => set.numbers.length === 6).length > 0 && !isLoading ? 'white' : '#9E9E9E',
-            border: 'none',
-            borderRadius: 'clamp(12px, 3vw, 15px)',
-            fontSize: 'clamp(16px, 4vw, 18px)',
-            fontWeight: '700',
-            cursor: ticketSets.filter((set) => set.numbers.length === 6).length > 0 && !isLoading ? 'pointer' : 'not-allowed',
-            fontFamily: 'SF Pro, Arial, sans-serif',
-            boxShadow:
-              ticketSets.filter((set) => set.numbers.length === 6).length > 0 && !isLoading
-                ? '0 6px 20px rgba(147, 238, 0, 0.4)'
-                : 'none',
-            transition: 'all 0.3s ease',
-            marginBottom: 'clamp(80px, 15vh, 100px)',
-          }}
-        >
-          {isLoading
-            ? `⏳ 구매 중... (${purchaseCount}/${totalCount})`
-            : (() => {
-                const completed = ticketSets.filter((set) => set.numbers.length === 6).length;
-                const total = ticketSets.length;
-                if (completed === 0) {
-                  return '번호를 선택해주세요';
-                } else if (completed === total) {
-                  return `🎫 ${completed}장 구매하기 (${(parseFloat(ticketPrice) * completed).toFixed(4)} KAIA)`;
-                } else {
-                  return `🎫 완성된 ${completed}장 구매 (${(parseFloat(ticketPrice) * completed).toFixed(4)} KAIA)`;
-                }
-              })()}
-        </button>
+            {/* 다음/구매 버튼 */}
+            <button
+              onClick={handleManualNext}
+              disabled={selectedNumbers.length < 6 || isLoading}
+              style={{
+                width: '100%',
+                padding: '2vh 0',
+                background:
+                  selectedNumbers.length < 6 || isLoading
+                    ? '#666'
+                    : 'linear-gradient(135deg, #93EE00 0%, #7BC800 100%)',
+                color: selectedNumbers.length < 6 || isLoading ? '#999' : '#000',
+                fontSize: 'clamp(13px, 3.3vw, 14px)',
+                fontWeight: 700,
+                border: 'none',
+                borderRadius: '2vw',
+                cursor: selectedNumbers.length < 6 || isLoading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isLoading
+                ? '처리 중...'
+                : currentSetId < quantity
+                ? `다음 세트 (${currentSetId + 1}/${quantity})`
+                : '🎫 구매하기'}
+            </button>
+          </div>
+        </div>
+      )}
       </div>
     </MobileLayout>
   );
 }
-

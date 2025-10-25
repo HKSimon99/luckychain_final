@@ -40,19 +40,16 @@ export default function FortuneOpenPage() {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'space-between',
           overflow: 'hidden',
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          padding: 'clamp(15px, 3vw, 20px)',
-          paddingTop: 'clamp(15px, 3vh, 20px)',
-          paddingBottom: 'clamp(15px, 3vh, 20px)',
+          padding: '0',
         }}
       >
-        {/* 배경 원 (펄스 애니메이션) - 더 아래로 이동 */}
+        {/* 배경 분홍색 원 */}
         <div
           style={{
             width: 'clamp(550px, 140vw, 750px)',
@@ -65,33 +62,21 @@ export default function FortuneOpenPage() {
               'radial-gradient(ellipse 50% 50% at 50% 50%, #E700B1 25%, #870D6B 100%)',
             borderRadius: '50%',
             zIndex: 0,
-            animation: 'pulse 3s ease-in-out infinite',
           }}
         />
 
-        {/* 상단 영역 */}
+        {/* 타이틀과 별 장식 */}
         <div
           style={{
+            position: 'relative',
             width: '100%',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: '12vh',
             zIndex: 10,
-            flex: '0 0 auto',
           }}
         >
-          {/* 타이틀과 별 장식 - 위쪽에 배치 */}
-          <div
-            style={{
-              position: 'relative',
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: 'clamp(30px, 5vh, 40px)',
-              marginBottom: 'clamp(50px, 8vh, 70px)',
-            }}
-          >
             {/* 왼쪽 별 이미지 */}
             <div
               style={{
@@ -170,78 +155,76 @@ export default function FortuneOpenPage() {
             </div>
           </div>
 
-          {/* 포춘 메시지 박스 */}
-          <div
-            style={{
-              width: '100%',
-              maxWidth: 'clamp(290px, 86vw, 360px)',
-              minHeight: 'clamp(95px, 15vh, 120px)',
-              background: '#EFEFEF',
-              boxShadow: '4px 4px 10px rgba(0, 0, 0, 0.35)',
-              borderRadius: 'clamp(13px, 3.3vw, 16px)',
-              padding: 'clamp(16px, 4vw, 20px)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 'clamp(12px, 2vh, 16px)',
-              opacity: fadeIn ? 1 : 0,
-              transform: `scale(${fadeIn ? 1 : 0.9})`,
-              transition: 'opacity 0.8s ease 0.3s, transform 0.8s ease 0.3s',
-            }}
-          >
-            <div
-              style={{
-                textAlign: 'center',
-                color: '#430303',
-                fontSize: 'clamp(16px, 4.2vw, 20px)',
-                fontWeight: '700',
-                lineHeight: '1.5',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              {fortuneParts.top && <div>{fortuneParts.top}</div>}
-              {fortuneParts.bottom && (
-                <div style={{ marginTop: 'clamp(6px, 1.5vw, 8px)' }}>{fortuneParts.bottom}</div>
-              )}
-            </div>
-          </div>
-
-          {/* 서브 텍스트 */}
+        {/* 포춘 메시지 박스 - 타이틀 아래 11vh, 높이 18vh */}
+        <div
+          style={{
+            width: '88vw',
+            height: '14vh',
+            background: '#EFEFEF',
+            boxShadow: '4px 4px 10px rgba(0, 0, 0, 0.35)',
+            borderRadius: '16px',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: '22vh',
+            opacity: fadeIn ? 1 : 0,
+            transform: `scale(${fadeIn ? 1 : 0.9})`,
+            transition: 'opacity 0.8s ease 0.3s, transform 0.8s ease 0.3s',
+            zIndex: 10,
+          }}
+        >
           <div
             style={{
               textAlign: 'center',
-              color: 'rgba(255, 255, 255, 0.95)',
-              fontSize: 'clamp(12px, 3vw, 14px)',
-              fontWeight: '500',
+              color: '#430303',
+              fontSize: 'clamp(16px, 4.2vw, 20px)',
+              fontWeight: '700',
+              lineHeight: '1.5',
               fontFamily: 'SF Pro, Arial, sans-serif',
-              marginBottom: 'clamp(8px, 1.5vh, 12px)',
-              opacity: fadeIn ? 1 : 0,
-              transition: 'opacity 0.8s ease 0.5s',
             }}
           >
-            - 두려움 없이 도전하는 당신에게 축복을 -
+            {fortuneParts.top}
           </div>
         </div>
 
-        {/* 중앙 영역 - 쿠키 */}
+        {/* 서브 텍스트 - 메시지 박스 아래 2-3vh */}
+        <div
+          style={{
+            textAlign: 'center',
+            color: 'rgba(255, 255, 255, 0.95)',
+            fontSize: 'clamp(12px, 3vw, 14px)',
+            fontWeight: '500',
+            fontFamily: 'SF Pro, Arial, sans-serif',
+            marginTop: '2.5vh',
+            opacity: fadeIn ? 1 : 0,
+            transition: 'opacity 0.8s ease 0.5s',
+            zIndex: 10,
+          }}
+        >
+          - {fortuneParts.bottom} -
+        </div>
+
+        {/* 쿠키 이미지 - 서브 텍스트 아래 8vh (조금 위로) */}
         <div
           style={{
             width: '100%',
+            height: '21vh',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            flex: '1 1 auto',
+            marginTop: '2vh',
             zIndex: 5,
-            minHeight: 0,
           }}
         >
-          {/* 열린 쿠키 이미지 */}
           <div
             style={{
               position: 'relative',
-              width: 'clamp(200px, 50vw, 260px)',
-              height: 'clamp(200px, 50vw, 260px)',
+              width: '62vw',
+              height: '62vw',
+              maxWidth: '250px',
+              maxHeight: '250px',
               opacity: fadeIn ? 1 : 0,
               transform: `rotate(21deg) scale(${fadeIn ? 1 : 0.8})`,
               transition: 'opacity 1s ease 0.5s, transform 1s ease 0.5s',
@@ -262,17 +245,21 @@ export default function FortuneOpenPage() {
           </div>
         </div>
 
-        {/* 하단 영역 - 버튼 */}
+        {/* 하단 버튼 - 쿠키 이미지 아래 11vh, 하단에서 4.5vh */}
         <div
           style={{
+            position: 'absolute',
+            bottom: '4.5vh',
+            left: '0',
+            right: '0',
             width: '100%',
             display: 'flex',
-            gap: 'clamp(10px, 2.5vw, 12px)',
+            gap: '4.5vw',
+            padding: '0 4.5vw',
             zIndex: 10,
             opacity: fadeIn ? 1 : 0,
             transition: 'opacity 0.8s ease 0.8s',
             animation: fadeIn ? 'fadeInUp 0.8s ease 0.8s' : 'none',
-            flex: '0 0 auto',
           }}
         >
           {/* 새로운 복권 구매 */}
@@ -280,18 +267,19 @@ export default function FortuneOpenPage() {
             onClick={() => router.push('/buy')}
             style={{
               flex: 1,
-              padding: 'clamp(13px, 3.3vw, 16px)',
+              height: '7.5vh',
               background: '#380D44',
               color: '#FFF',
               fontSize: 'clamp(13px, 3.3vw, 15px)',
               fontWeight: '500',
               border: '0.5px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: 'clamp(10px, 2.5vw, 12px)',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontFamily: 'SF Pro, Arial, sans-serif',
               boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.35)',
               transition: 'all 0.3s ease',
             }}
+
             onMouseDown={(e) => {
               e.currentTarget.style.transform = 'scale(0.95)';
             }}
@@ -313,21 +301,22 @@ export default function FortuneOpenPage() {
 
           {/* 내 복권 확인하기 */}
           <button
-            onClick={() => router.push('/my')}
+            onClick={() => router.push('/my-tickets')}
             style={{
               flex: 1,
-              padding: 'clamp(13px, 3.3vw, 16px)',
+              height: '7.5vh',
               background: 'linear-gradient(135deg, #DF78EC 0%, #FF20A2 100%)',
               color: '#FFF',
               fontSize: 'clamp(13px, 3.3vw, 15px)',
               fontWeight: '500',
               border: '0.5px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: 'clamp(10px, 2.5vw, 12px)',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontFamily: 'SF Pro, Arial, sans-serif',
               boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.35)',
               transition: 'all 0.3s ease',
             }}
+
             onMouseDown={(e) => {
               e.currentTarget.style.transform = 'scale(0.95)';
             }}

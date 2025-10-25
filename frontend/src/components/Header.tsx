@@ -99,15 +99,16 @@ export default function Header({ showMenu = true }: HeaderProps) {
             onClick={handleWalletClick}
             style={{
               padding: 'clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 12px)',
-              background: isConnected ? '#93EE00' : '#380D44',
-              color: isConnected ? '#000' : '#FFF',
-              border: 'none',
+              background: isConnected ? '#380D44' : '#93EE00',
+              color: isConnected ? '#FFF' : '#000',
+              border: isConnected ? '1.5px solid #93EE00' : 'none',
               borderRadius: 'clamp(8px, 2vw, 10px)',
               fontSize: 'clamp(11px, 2.8vw, 13px)',
               fontWeight: '600',
               cursor: 'pointer',
               fontFamily: 'SF Pro, Arial, sans-serif',
               whiteSpace: 'nowrap',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             }}
           >
             {isConnected ? `🔗 ${formatAddress(address!)}` : '🔗 연결'}
@@ -118,14 +119,14 @@ export default function Header({ showMenu = true }: HeaderProps) {
             <div
               style={{
                 position: 'absolute',
-                top: 'calc(100% + 5px)',
+                top: 'calc(100% + 8px)',
                 right: 0,
-                background: 'white',
-                border: '1px solid #380D44',
-                borderRadius: '8px',
-                padding: '8px',
-                minWidth: '150px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                background: '#380D44',
+                border: '2px solid #93EE00',
+                borderRadius: '10px',
+                padding: '6px',
+                minWidth: '160px',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
                 zIndex: 1000,
               }}
             >
@@ -133,28 +134,47 @@ export default function Header({ showMenu = true }: HeaderProps) {
                 onClick={() => { open(); setShowWalletMenu(false); }}
                 style={{
                   width: '100%',
-                  padding: '8px 12px',
-                  background: 'transparent',
+                  padding: '10px 12px',
+                  background: '#93EE00',
                   border: 'none',
-                  textAlign: 'left',
+                  borderRadius: '6px',
+                  textAlign: 'center',
                   cursor: 'pointer',
                   fontSize: '13px',
-                  borderBottom: '1px solid #eee',
+                  fontWeight: '600',
+                  color: '#000',
+                  marginBottom: '6px',
+                  fontFamily: 'SF Pro, Arial, sans-serif',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#A5FF11';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#93EE00';
                 }}
               >
-                🔄 변경하기
+                🔄 지갑 변경
               </button>
               <button
                 onClick={handleDisconnect}
                 style={{
                   width: '100%',
-                  padding: '8px 12px',
-                  background: 'transparent',
+                  padding: '10px 12px',
+                  background: '#FF3B30',
                   border: 'none',
-                  textAlign: 'left',
+                  borderRadius: '6px',
+                  textAlign: 'center',
                   cursor: 'pointer',
                   fontSize: '13px',
-                  color: '#FF3B30',
+                  fontWeight: '600',
+                  color: '#FFF',
+                  fontFamily: 'SF Pro, Arial, sans-serif',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#FF5C50';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#FF3B30';
                 }}
               >
                 🔌 연결 해제

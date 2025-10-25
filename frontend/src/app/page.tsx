@@ -126,28 +126,47 @@ export default function HomePage() {
       {/* 메인 콘텐츠 */}
       <div
         style={{
-          flex: 1,
-          overflow: 'auto',
-          paddingBottom: 'clamp(80px, 15vh, 100px)',
+          position: 'fixed',
+          top: '60px',
+          left: 0,
+          right: 0,
+          bottom: '85px',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-evenly',
         }}
       >
         {/* 타이머 카드 */}
         <div
           style={{
-            padding: 'clamp(15px, 4vw, 20px)',
-            paddingTop: 'clamp(25px, 6vw, 35px)',
+            padding: '0 3vw',
           }}
         >
+          {/* 현재 회차 진행중 표시 */}
+          <div
+            style={{
+              textAlign: 'center',
+              marginBottom: '1.5vh',
+              fontSize: 'clamp(13px, 3.3vw, 15px)',
+              fontWeight: '600',
+              color: '#FFFFFF',
+              fontFamily: 'SF Pro, Arial, sans-serif',
+            }}
+          >
+            현재 {currentDrawId}회차 진행중
+      </div>
+
           <div
             style={{
               background: '#FFFFFF',
-              borderRadius: 'clamp(8px, 2vw, 10px)',
-              padding: 'clamp(18px, 4.5vw, 22px)',
+              borderRadius: '2vw',
+              padding: '2.5vh 3vw',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             }}
           >
             {/* 타이틀 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 10px)', marginBottom: 'clamp(18px, 4.5vw, 22px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2vw', marginBottom: '2vh' }}>
               <svg width="clamp(20px, 5vw, 24px)" height="clamp(20px, 5vw, 24px)" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="9" stroke="#5E5E5E" strokeWidth="2" />
                 <path d="M12 7V12L15 14" stroke="#5E5E5E" strokeWidth="2" strokeLinecap="round" />
@@ -158,14 +177,14 @@ export default function HomePage() {
             </div>
 
             {/* 타이머 */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'clamp(8px, 2vw, 10px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2vw' }}>
               {/* 일 */}
-              <div style={{ flex: 1, maxWidth: 'clamp(70px, 18vw, 85px)' }}>
+              <div style={{ flex: 1, maxWidth: '16vw' }}>
                 <div
                   style={{
                     background: '#414141',
-                    borderRadius: 'clamp(5px, 1.2vw, 6px)',
-                    padding: 'clamp(14px, 3.5vw, 18px) clamp(10px, 2.5vw, 12px)',
+                    borderRadius: '1.5vw',
+                    padding: '2.5vh 2vw',
                     textAlign: 'center',
                     aspectRatio: '1',
                     display: 'flex',
@@ -173,27 +192,27 @@ export default function HomePage() {
                     justifyContent: 'center',
                   }}
                 >
-                  <div style={{ fontSize: 'clamp(36px, 9vw, 48px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
+                  <div style={{ fontSize: 'clamp(28px, 7vw, 36px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
                     {days}
                   </div>
                 </div>
-                <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#000', textAlign: 'center', marginTop: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(9px, 2.3vw, 11px)', color: '#000', textAlign: 'center', marginTop: '1vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   일
               </div>
             </div>
 
               {/* 구분자 : */}
-              <div style={{ fontSize: 'clamp(32px, 8vw, 40px)', fontWeight: '700', color: '#000', paddingBottom: 'clamp(20px, 5vw, 25px)' }}>
+              <div style={{ fontSize: 'clamp(24px, 6vw, 30px)', fontWeight: '700', color: '#000', paddingBottom: '2.5vh' }}>
                 :
                 </div>
                 
               {/* 시간 */}
-              <div style={{ flex: 1, maxWidth: 'clamp(70px, 18vw, 85px)' }}>
+              <div style={{ flex: 1, maxWidth: '16vw' }}>
                 <div
                   style={{
                     background: '#414141',
-                    borderRadius: 'clamp(5px, 1.2vw, 6px)',
-                    padding: 'clamp(14px, 3.5vw, 18px) clamp(10px, 2.5vw, 12px)',
+                    borderRadius: '1.5vw',
+                    padding: '2.5vh 2vw',
                     textAlign: 'center',
                     aspectRatio: '1',
                     display: 'flex',
@@ -201,27 +220,27 @@ export default function HomePage() {
                     justifyContent: 'center',
                   }}
                 >
-                  <div style={{ fontSize: 'clamp(36px, 9vw, 48px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
+                  <div style={{ fontSize: 'clamp(28px, 7vw, 36px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
                     {hours}
                   </div>
               </div>
-                <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#000', textAlign: 'center', marginTop: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(9px, 2.3vw, 11px)', color: '#000', textAlign: 'center', marginTop: '1vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   시간
                 </div>
                       </div>
                       
               {/* 구분자 : */}
-              <div style={{ fontSize: 'clamp(32px, 8vw, 40px)', fontWeight: '700', color: '#000', paddingBottom: 'clamp(20px, 5vw, 25px)' }}>
+              <div style={{ fontSize: 'clamp(24px, 6vw, 30px)', fontWeight: '700', color: '#000', paddingBottom: '2.5vh' }}>
                 :
                         </div>
 
               {/* 분 */}
-              <div style={{ flex: 1, maxWidth: 'clamp(70px, 18vw, 85px)' }}>
+              <div style={{ flex: 1, maxWidth: '16vw' }}>
                 <div
                   style={{
                     background: '#414141',
-                    borderRadius: 'clamp(5px, 1.2vw, 6px)',
-                    padding: 'clamp(14px, 3.5vw, 18px) clamp(10px, 2.5vw, 12px)',
+                    borderRadius: '1.5vw',
+                    padding: '2.5vh 2vw',
                     textAlign: 'center',
                     aspectRatio: '1',
                     display: 'flex',
@@ -229,27 +248,27 @@ export default function HomePage() {
                     justifyContent: 'center',
                   }}
                 >
-                  <div style={{ fontSize: 'clamp(36px, 9vw, 48px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
+                  <div style={{ fontSize: 'clamp(28px, 7vw, 36px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
                     {minutes}
                               </div>
                             </div>
-                <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#000', textAlign: 'center', marginTop: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(9px, 2.3vw, 11px)', color: '#000', textAlign: 'center', marginTop: '1vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   분
                               </div>
             </div>
 
               {/* 구분자 : */}
-              <div style={{ fontSize: 'clamp(32px, 8vw, 40px)', fontWeight: '700', color: '#000', paddingBottom: 'clamp(20px, 5vw, 25px)' }}>
+              <div style={{ fontSize: 'clamp(24px, 6vw, 30px)', fontWeight: '700', color: '#000', paddingBottom: '2.5vh' }}>
                 :
               </div>
               
               {/* 초 */}
-              <div style={{ flex: 1, maxWidth: 'clamp(70px, 18vw, 85px)' }}>
+              <div style={{ flex: 1, maxWidth: '16vw' }}>
                 <div
                   style={{
                     background: '#414141',
-                    borderRadius: 'clamp(5px, 1.2vw, 6px)',
-                    padding: 'clamp(14px, 3.5vw, 18px) clamp(10px, 2.5vw, 12px)',
+                    borderRadius: '1.5vw',
+                    padding: '2.5vh 2vw',
                     textAlign: 'center',
                     aspectRatio: '1',
                     display: 'flex',
@@ -257,11 +276,11 @@ export default function HomePage() {
                     justifyContent: 'center',
                   }}
                 >
-                  <div style={{ fontSize: 'clamp(36px, 9vw, 48px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
+                  <div style={{ fontSize: 'clamp(28px, 7vw, 36px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1' }}>
                     {seconds}
                   </div>
                   </div>
-                <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#000', textAlign: 'center', marginTop: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(9px, 2.3vw, 11px)', color: '#000', textAlign: 'center', marginTop: '1vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   초
                   </div>
                 </div>
@@ -272,42 +291,42 @@ export default function HomePage() {
         {/* 누적 상금 카드 */}
         <div
           style={{
-            padding: '0 clamp(15px, 4vw, 20px) clamp(15px, 4vw, 20px)',
+            padding: '0 3vw',
           }}
         >
           <div
             style={{
               background: 'linear-gradient(135deg, #6B0F70 0%, #4A0E68 100%)',
-              borderRadius: 'clamp(8px, 2vw, 10px)',
-              padding: 'clamp(20px, 5vw, 25px)',
+              borderRadius: '2vw',
+              padding: '3vh 3vw',
               border: '0.5px solid rgba(255, 255, 255, 0.3)',
               textAlign: 'center',
             }}
           >
             {/* 타이틀 */}
-            <div style={{ fontSize: 'clamp(15px, 3.8vw, 18px)', fontWeight: '700', color: '#FFF', marginBottom: 'clamp(15px, 4vw, 20px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
-              누적 상금
+            <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', marginBottom: '2vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+              현재 누적 상금
               </div>
 
             {/* 메인 금액 */}
-            <div style={{ marginBottom: 'clamp(8px, 2vw, 10px)' }}>
-              <div style={{ fontSize: 'clamp(32px, 8vw, 42px)', fontWeight: '700', color: '#93EE00', letterSpacing: '0.02em', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1.2' }}>
+            <div style={{ marginBottom: '1.5vh' }}>
+              <div style={{ fontSize: 'clamp(28px, 7vw, 36px)', fontWeight: '700', color: '#93EE00', letterSpacing: '0.02em', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1.2' }}>
                 {parseInt(totalPrize).toLocaleString()} KAIA
               </div>
             </div>
 
             {/* 원화 */}
-            <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: '600', color: '#FFD700', marginBottom: 'clamp(18px, 4.5vw, 22px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+            <div style={{ fontSize: 'clamp(14px, 3.5vw, 18px)', fontWeight: '600', color: '#FFD700', marginBottom: '2.5vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
               ₩{totalPrizeKRW}
               </div>
 
             {/* 하단 정보 */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'clamp(10px, 2.5vw, 12px)' }}>
-              <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2vw' }}>
+              <div style={{ fontSize: 'clamp(9px, 2.3vw, 11px)', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                 참여자
                       </div>
-              <div style={{ width: '1px', height: 'clamp(10px, 2.5vw, 12px)', background: '#FFF' }} />
-              <div style={{ fontSize: 'clamp(10px, 2.5vw, 12px)', color: '#FFF', fontWeight: '600', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+              <div style={{ width: '1px', height: '1vh', background: '#FFF' }} />
+              <div style={{ fontSize: 'clamp(9px, 2.3vw, 11px)', color: '#FFF', fontWeight: '600', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                 총 {ticketCount}명
                   </div>
                 </div>
@@ -317,21 +336,21 @@ export default function HomePage() {
         {/* KAIA 카드 */}
         <div
           style={{
-            padding: '0 clamp(15px, 4vw, 20px) clamp(15px, 4vw, 20px)',
+            padding: '0 3vw',
           }}
         >
           <div
             style={{
               background: 'linear-gradient(292deg, #6E0058 6.55%, #450058 65.52%)',
-              borderRadius: 'clamp(8px, 2vw, 10px)',
-              padding: 'clamp(18px, 4.5vw, 22px) clamp(15px, 4vw, 20px)',
+              borderRadius: '2vw',
+              padding: '2.5vh 3vw',
               border: '0.5px solid #FFFFFF',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'clamp(15px, 4vw, 20px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2vh' }}>
               {/* 왼쪽: 코인 아이콘 + 이름 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(10px, 2.5vw, 12px)' }}>
-                <div style={{ width: 'clamp(48px, 12vw, 57px)', height: 'clamp(48px, 12vw, 57px)', position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2vw' }}>
+                <div style={{ width: '10vw', height: '10vw', position: 'relative' }}>
                   <Image
                     src="/coin-icon.png"
                     alt="KAIA"
@@ -341,10 +360,10 @@ export default function HomePage() {
                       />
                     </div>
                     <div>
-                  <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  <div style={{ fontSize: 'clamp(13px, 3.3vw, 15px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                     KAIA
                     </div>
-                  <div style={{ fontSize: 'clamp(9px, 2.3vw, 10px)', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', marginTop: 'clamp(2px, 0.5vw, 3px)' }}>
+                  <div style={{ fontSize: 'clamp(8px, 2vw, 9px)', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif', marginTop: 'clamp(2px, 0.5vw, 3px)' }}>
                     카이아
                   </div>
                 </div>
@@ -352,31 +371,31 @@ export default function HomePage() {
                   
               {/* 오른쪽: 가격 정보 */}
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(13px, 3.3vw, 15px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   {ticketPrice} KAIA
                       </div>
-                <div style={{ fontSize: 'clamp(11px, 2.8vw, 12px)', fontWeight: '700', color: '#34D055', marginTop: 'clamp(2px, 0.5vw, 3px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(10px, 2.5vw, 11px)', fontWeight: '700', color: '#34D055', marginTop: 'clamp(2px, 0.5vw, 3px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   +1.8%
                             </div>
                         </div>
                       </div>
 
-            <div style={{ height: '0.3px', background: '#FFF', marginBottom: 'clamp(15px, 4vw, 20px)' }} />
+            <div style={{ height: '0.3px', background: '#FFF', marginBottom: '2vh' }} />
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                <div style={{ fontSize: 'clamp(11px, 2.8vw, 12px)', color: '#FFF', marginBottom: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(10px, 2.5vw, 11px)', color: '#FFF', marginBottom: '1vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   현재 회차 금액
                     </div>
-                <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(13px, 3.3vw, 15px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   {currentDrawPrize} KAIA
                       </div>
                     </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 'clamp(11px, 2.8vw, 12px)', color: '#FFF', marginBottom: 'clamp(6px, 1.5vw, 8px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(10px, 2.5vw, 11px)', color: '#FFF', marginBottom: '1vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   이월된 금액
                   </div>
-                <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                <div style={{ fontSize: 'clamp(13px, 3.3vw, 15px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   {parseFloat(accumulatedJackpot).toFixed(2)} KAIA
                 </div>
               </div>

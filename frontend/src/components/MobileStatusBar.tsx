@@ -48,6 +48,8 @@ export default function MobileStatusBar() {
   return (
     <div
       style={{
+        width: '100%',
+        alignSelf: 'stretch',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -60,7 +62,7 @@ export default function MobileStatusBar() {
       }}
     >
       {/* 시간 */}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, textAlign: 'left' }}>
         {currentTime}
       </div>
 

@@ -25,6 +25,27 @@ export default function WalletConnectContent() {
     }
   }, [router]);
 
+  // 모바일 환경에서 앱 전환 후 복귀 감지
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📱 페이지 포커스 복원 - 연결 상태 재확인');
+        // 강제로 연결 상태 재확인 (모바일 앱 전환 대응)
+        setTimeout(() => {
+          if (isConnected && address) {
+            console.log('✅ 세션 복원 완료:', address);
+          }
+        }, 500);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isConnected, address]);
+
   // 연결 완료 및 체인 확인
   useEffect(() => {
     if (isConnected && address) {

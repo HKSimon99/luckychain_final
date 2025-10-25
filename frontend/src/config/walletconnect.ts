@@ -47,10 +47,11 @@ export const metadata = {
 // Networks (createAppKit에서 최소 1개 요구)
 export const networks = [kaiaKairos];
 
-// Wagmi Adapter
+// Wagmi Adapter (모바일 최적화)
 export const wagmiAdapter = new WagmiAdapter({
   projectId,
   networks,
+  ssr: false, // 모바일 환경 최적화
 });
 
 export const config = wagmiAdapter.wagmiConfig;

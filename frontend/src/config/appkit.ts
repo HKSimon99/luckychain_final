@@ -53,12 +53,18 @@ export function initializeAppKit(): Promise<boolean> {
         metadata,
         features: {
           analytics: false,
+          email: false,
+          socials: [],
         },
         themeMode: 'dark',
         themeVariables: {
           '--w3m-accent': '#93EE00',
           '--w3m-border-radius-master': '8px',
         },
+        enableWalletConnect: true,
+        enableInjected: true,
+        enableCoinbase: false,
+        allowUnsupportedChains: false,
       });
 
       isInitialized = true;

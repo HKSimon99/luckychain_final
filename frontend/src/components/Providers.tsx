@@ -32,6 +32,30 @@ export function Providers({ children }: { children: ReactNode }) {
       });
   }, []);
 
+  // 모바일 환경에서 페이지 복귀 시 세션 복원
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📱 페이지 활성화 - 연결 상태 복원 시도');
+        // QueryClient 무효화하여 최신 상태 가져오기
+        queryClient.invalidateQueries();
+      }
+    };
+
+    const handleFocus = () => {
+      console.log('🔍 윈도우 포커스 - 연결 상태 복원 시도');
+      queryClient.invalidateQueries();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>

@@ -1,151 +1,107 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import { ethers } from 'ethers';
+import Image from 'next/image';
 import MobileLayout from '@/components/MobileLayout';
-import Header from '@/components/Header';
-import * as lottoAbiModule from '@/lib/lottoAbi.json';
+import MobileStatusBar from '@/components/MobileStatusBar';
+import * as lottoAbiModule from '@/lib/lotto-abi-full.json';
 
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
 const rpcUrl = 'https://public-en-kairos.node.kaia.io';
 
-interface PrizeDistribution {
-  drawId: number;
-  firstWinners: number;
-  secondWinners: number;
-  thirdWinners: number;
-  firstPrize: string;
-  secondPrize: string;
-  thirdPrize: string;
-  rolloverAmount: string;
-}
-
 export default function ResultPage() {
-  const [contract, setContract] = useState<any>(null);
-  const [currentDrawId, setCurrentDrawId] = useState(0);
-  const [selectedDraw, setSelectedDraw] = useState(0);
+  const router = useRouter();
+  const { address, isConnected } = useAccount();
+  const [selectedDrawId, setSelectedDrawId] = useState(0);
   const [winningNumbers, setWinningNumbers] = useState<number[]>([]);
-  const [prizeDistributions, setPrizeDistributions] = useState<PrizeDistribution[]>([]);
+  const [myTicketCount, setMyTicketCount] = useState(0);
+  const [totalPrize, setTotalPrize] = useState('0');
+  const [isWinner, setIsWinner] = useState(false);
+  const [myRank, setMyRank] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  // 컨트랙트 초기화
+  // 데이터 로드
   useEffect(() => {
-    const initContract = async () => {
+    const loadData = async () => {
       try {
         const provider = new ethers.JsonRpcProvider(rpcUrl);
         const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
-        setContract(contract);
 
-        const currentDraw = await contract.currentDrawId();
-        setCurrentDrawId(Number(currentDraw));
-        setSelectedDraw(Number(currentDraw) - 1); // 이전 회차 기본 선택
+        // 현재 회차
+        const currentDrawId = await contract.currentDrawId();
+        const drawId = Number(currentDrawId) > 1 ? Number(currentDrawId) - 1 : Number(currentDrawId);
+        setSelectedDrawId(drawId);
 
-        // 상금 분배 내역 로드
-        await loadPrizeDistributions(provider, contract);
+        // 당첨 번호 조회
+        const numbers: number[] = [];
+        for (let i = 0; i < 6; i++) {
+          const num = await contract.winningNumbers(drawId, i);
+          numbers.push(Number(num));
+        }
+        setWinningNumbers(numbers);
 
-        setIsLoading(false);
+        // 내 티켓 조회 (당첨 확인)
+        if (isConnected && address) {
+          const currentBlock = await provider.getBlockNumber();
+          const fromBlock = Math.max(0, currentBlock - 100000);
+          
+          const filter = contract.filters.TicketPurchased(address);
+          const events = await contract.queryFilter(filter, fromBlock, 'latest');
+
+          // 선택된 회차의 티켓만
+          const myDrawTickets = events.filter((e: any) => Number(e.args[2] || e.args.drawId) === drawId);
+          setMyTicketCount(myDrawTickets.length);
+
+          // 당첨 여부 확인
+          if (numbers.some(n => n > 0)) {
+            for (const event of myDrawTickets) {
+              const eventData = event as any;
+              const ticketNumbers = Array.from(eventData.args[3] || eventData.args.numbers || []).map((n: any) => Number(n));
+              
+              const matchCount = ticketNumbers.filter((n: number) => numbers.includes(n)).length;
+              
+              if (matchCount >= 2) {
+                setIsWinner(true);
+                if (matchCount === 6) setMyRank('1등');
+                else if (matchCount === 5) setMyRank('2등');
+                else if (matchCount === 4) setMyRank('3등');
+                else if (matchCount === 3) setMyRank('4등');
+                else if (matchCount === 2) setMyRank('5등');
+                break;
+              }
+            }
+          }
+        }
+
       } catch (error) {
-        console.error('컨트랙트 초기화 실패:', error);
+        console.error('❌ 데이터 로드 실패:', error);
+      } finally {
         setIsLoading(false);
       }
     };
 
-    initContract();
-  }, []);
-
-  // 상금 분배 내역 로드
-  const loadPrizeDistributions = async (provider: any, contract: any) => {
-    try {
-      const currentBlock = await provider.getBlockNumber();
-      // 최근 5000 블록만 조회 (약 2~3시간 분량)
-      const fromBlock = Math.max(0, currentBlock - 5000);
-
-      const filter = contract.filters.PrizesDistributed();
-      const events = await contract.queryFilter(filter, fromBlock, 'latest');
-      
-      console.log(`✅ 상금 분배 조회: ${events.length}개 이벤트 발견`);
-
-      const distributions: PrizeDistribution[] = [];
-
-      for (const event of events) {
-        const eventLog = event as any; // TypeScript 타입 오류 회피
-        const drawId = eventLog.args?.drawId;
-        const firstWinners = eventLog.args?.firstWinners;
-        const secondWinners = eventLog.args?.secondWinners;
-        const thirdWinners = eventLog.args?.thirdWinners;
-        const firstPrize = eventLog.args?.firstPrize;
-        const secondPrize = eventLog.args?.secondPrize;
-        const thirdPrize = eventLog.args?.thirdPrize;
-        const rolloverAmount = eventLog.args?.rolloverAmount;
-
-        distributions.push({
-          drawId: Number(drawId),
-          firstWinners: Number(firstWinners),
-          secondWinners: Number(secondWinners),
-          thirdWinners: Number(thirdWinners),
-          firstPrize: firstPrize ? ethers.formatEther(firstPrize) : '0',
-          secondPrize: secondPrize ? ethers.formatEther(secondPrize) : '0',
-          thirdPrize: thirdPrize ? ethers.formatEther(thirdPrize) : '0',
-          rolloverAmount: rolloverAmount ? ethers.formatEther(rolloverAmount) : '0',
-        });
-      }
-
-      setPrizeDistributions(distributions.sort((a, b) => b.drawId - a.drawId));
-    } catch (error) {
-      console.error('상금 분배 내역 로드 실패:', error);
-    }
-  };
-
-  // 당첨 번호 조회
-  const loadWinningNumbers = async () => {
-    if (!contract || !selectedDraw) {
-      alert('회차를 선택해주세요!');
-      return;
-    }
-
-    if (selectedDraw >= currentDrawId) {
-      alert('아직 추첨이 진행되지 않은 회차입니다!');
-      return;
-    }
-
-    try {
-      const numbers: number[] = [];
-      for (let i = 0; i < 6; i++) {
-        const num = await contract.winningNumbers(selectedDraw, i);
-        numbers.push(Number(num));
-      }
-
-      if (numbers[0] === 0) {
-        alert('아직 당첨 번호가 생성되지 않았습니다!');
-        setWinningNumbers([]);
-      } else {
-        setWinningNumbers(numbers);
-      }
-    } catch (error) {
-      console.error('당첨 번호 조회 실패:', error);
-      alert('당첨 번호 조회에 실패했습니다.');
-      setWinningNumbers([]);
-    }
-  };
-
-  // 번호 색상
-  const getNumberColor = (num: number) => {
-    if (num <= 10) return '#FFC107';
-    if (num <= 20) return '#2196F3';
-    if (num <= 30) return '#F44336';
-    if (num <= 40) return '#9E9E9E';
-    return '#4CAF50';
-  };
-
-  // 해당 회차의 상금 분배 정보
-  const currentPrizeInfo = prizeDistributions.find((p) => p.drawId === selectedDraw);
+    loadData();
+  }, [address, isConnected]);
 
   if (isLoading) {
     return (
       <MobileLayout>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          <p style={{ color: 'white', fontSize: 'clamp(14px, 3.5vw, 16px)' }}>로딩 중...</p>
+        <div
+          style={{
+            width: '100%',
+            height: '100vh',
+            background: '#380D44',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+          }}
+        >
+          로딩 중...
         </div>
       </MobileLayout>
     );
@@ -153,459 +109,312 @@ export default function ResultPage() {
 
   return (
     <MobileLayout>
-      <Header />
-      
-      {/* 메인 콘텐츠 */}
       <div
         style={{
-          flex: 1,
-          padding: 'clamp(15px, 4vw, 20px)',
-          overflow: 'auto',
+          width: '100%',
+          maxWidth: '402px',
+          height: '100vh',
+          position: 'relative',
+          background: '#380D44',
+          overflow: 'hidden',
+          margin: '0 auto',
+          fontFamily: 'Noto Sans KR, SF Pro, Arial, sans-serif',
         }}
       >
-        {/* 제목 */}
-        <h2
-          style={{
-            fontSize: 'clamp(22px, 5.5vw, 26px)',
-            fontWeight: '700',
-            color: 'white',
-            textAlign: 'center',
-            marginBottom: 'clamp(20px, 5vw, 25px)',
-            fontFamily: 'SF Pro, Arial, sans-serif',
-          }}
-        >
-          🏆 당첨 결과
-        </h2>
-
-        {/* 회차 선택 */}
+        {/* 하단 연보라색 영역 */}
         <div
           style={{
-            background: 'white',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(20px, 5vw, 25px)',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
+            width: '100%',
+            height: '513px',
+            position: 'absolute',
+            bottom: 0,
+            background: '#CAACC7',
+            borderTopLeftRadius: '30px',
+            borderTopRightRadius: '30px',
+          }}
+        />
+
+        {/* 상단 상태바 */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
           }}
         >
-          <label
-            style={{
-              display: 'block',
-              fontSize: 'clamp(14px, 3.5vw, 16px)',
-              fontWeight: '600',
-              color: '#333',
-              marginBottom: 'clamp(10px, 3vw, 12px)',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            조회할 회차 선택
-          </label>
-          <div style={{ display: 'flex', gap: 'clamp(8px, 2vw, 10px)' }}>
-            <input
-              type="number"
-              min="1"
-              max={currentDrawId - 1}
-              value={selectedDraw || ''}
-              onChange={(e) => setSelectedDraw(Number(e.target.value))}
-              style={{
-                flex: 1,
-                padding: 'clamp(10px, 3vw, 12px)',
-                borderRadius: 'clamp(8px, 2vw, 10px)',
-                border: '1px solid #E0E0E0',
-                fontSize: 'clamp(14px, 3.5vw, 16px)',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-              placeholder="회차 번호"
-            />
-            <button
-              onClick={loadWinningNumbers}
-              style={{
-                padding: 'clamp(10px, 3vw, 12px) clamp(20px, 5vw, 25px)',
-                background: 'linear-gradient(135deg, #6B46C1 0%, #9333EA 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: 'clamp(8px, 2vw, 10px)',
-                fontSize: 'clamp(14px, 3.5vw, 16px)',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              조회
-            </button>
-          </div>
-          <p
-            style={{
-              fontSize: 'clamp(11px, 3vw, 13px)',
-              color: '#999',
-              marginTop: 'clamp(8px, 2vw, 10px)',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            현재 회차: #{currentDrawId} (조회 가능: 1 ~ {currentDrawId - 1})
-          </p>
+          <MobileStatusBar />
         </div>
 
-        {/* 당첨 번호 표시 */}
-        {winningNumbers.length > 0 && (
+        {/* 회차 제목 */}
+        <div
+          style={{
+            color: 'white',
+            fontWeight: '900',
+            fontSize: '17px',
+            position: 'absolute',
+            top: '60px',
+            width: '100%',
+            textAlign: 'center',
+            zIndex: 5,
+          }}
+        >
+          {selectedDrawId} 회차 결과
+        </div>
+
+        {/* 트로피 이미지 */}
+        <div
+          style={{
+            width: '110px',
+            height: '110px',
+            position: 'absolute',
+            top: '110px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 5,
+            fontSize: '80px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          🏆
+        </div>
+
+        {/* 축하 문구 */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '240px',
+            width: '100%',
+            textAlign: 'center',
+            color: 'white',
+            fontSize: '24px',
+            fontWeight: '900',
+            zIndex: 5,
+          }}
+        >
+          {isWinner ? '당첨을 축하합니다!' : '결과를 확인하세요'}
+        </div>
+
+        {/* 서브 텍스트 */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '275px',
+            width: '100%',
+            textAlign: 'center',
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: '500',
+            zIndex: 5,
+          }}
+        >
+          {isWinner ? '상금은 지갑으로 전송되었습니다' : '당첨 번호를 확인하세요'}
+        </div>
+
+        {/* Blockchain Explorer 박스 */}
+        <div
+          style={{
+            width: '340px',
+            height: '90px',
+            background: 'white',
+            borderRadius: '15px',
+            position: 'absolute',
+            top: '330px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            textAlign: 'center',
+            boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.2)',
+            zIndex: 5,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <div
             style={{
-              background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
-              borderRadius: 'clamp(15px, 4vw, 20px)',
-              padding: 'clamp(20px, 5vw, 25px)',
-              marginBottom: 'clamp(15px, 4vw, 20px)',
-              boxShadow: '0 8px 24px rgba(255, 215, 0, 0.4)',
+              color: '#740078',
+              fontSize: '18px',
+              fontWeight: '800',
             }}
           >
-            <h3
-              style={{
-                fontSize: 'clamp(16px, 4vw, 18px)',
-                fontWeight: '700',
-                color: '#333',
-                textAlign: 'center',
-                marginBottom: 'clamp(15px, 4vw, 18px)',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              🎯 {selectedDraw}회차 당첨 번호
-            </h3>
+            Blockchain Explorer
+          </div>
+          <div
+            style={{
+              color: '#4C4C4C',
+              fontSize: '11px',
+              marginTop: '5px',
+              lineHeight: '18px',
+              fontWeight: '500',
+            }}
+          >
+            거래가 블록체인 네트워크에<br />
+            적법하게 기록되고 위변조되지 않음을 검증합니다.
+          </div>
+        </div>
 
+        {/* 당첨 번호 영역 */}
+        <div
+          style={{
+            width: '360px',
+            height: '100px',
+            background: 'rgba(255, 255, 255, 0.35)',
+            borderRadius: '15px',
+            position: 'absolute',
+            top: '455px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '10px 20px',
+            zIndex: 5,
+          }}
+        >
+          {/* 라벨 */}
+          <div
+            style={{
+              color: '#1A1A1A',
+              fontWeight: '700',
+              fontSize: '14px',
+              marginBottom: '10px',
+            }}
+          >
+            당첨 번호
+          </div>
+
+          {/* 번호들 */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            {/* 왼쪽 화살표 */}
             <div
               style={{
-                display: 'flex',
-                justifyContent: 'center',
-                gap: 'clamp(8px, 2vw, 10px)',
-                flexWrap: 'wrap',
+                color: 'white',
+                fontSize: '20px',
+                fontWeight: 'bold',
+                margin: '0 5px',
+                cursor: 'pointer',
+                userSelect: 'none',
               }}
             >
-              {winningNumbers.map((num, idx) => (
+              &lt;
+            </div>
+
+            {/* 번호 박스들 */}
+            {winningNumbers.length > 0 ? (
+              winningNumbers.map((num, idx) => (
                 <div
                   key={idx}
                   style={{
-                    width: 'clamp(50px, 12vw, 60px)',
-                    height: 'clamp(50px, 12vw, 60px)',
-                    borderRadius: '50%',
-                    background: getNumberColor(num),
+                    width: '40px',
+                    height: '40px',
+                    background: idx === 0 ? '#F2B705' : '#5C2B82',
                     color: 'white',
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 'clamp(20px, 5vw, 24px)',
-                    fontWeight: '700',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                   }}
                 >
                   {num}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 상금 분배 정보 */}
-        {currentPrizeInfo && (
-          <div
-            style={{
-              background: 'white',
-              borderRadius: 'clamp(15px, 4vw, 20px)',
-              padding: 'clamp(20px, 5vw, 25px)',
-              marginBottom: 'clamp(15px, 4vw, 20px)',
-            }}
-          >
-            <h3
-              style={{
-                fontSize: 'clamp(16px, 4vw, 18px)',
-                fontWeight: '600',
-                color: '#333',
-                marginBottom: 'clamp(15px, 4vw, 18px)',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              💰 상금 분배
-            </h3>
-
-            {parseFloat(currentPrizeInfo.rolloverAmount) > 0 ? (
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: 'clamp(20px, 5vw, 25px)',
-                  background: '#FFF3CD',
-                  borderRadius: 'clamp(10px, 3vw, 12px)',
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: 'clamp(14px, 3.5vw, 16px)',
-                    color: '#856404',
-                    fontWeight: '600',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                  }}
-                >
-                  1등 당첨자 없음
-                </p>
-                <p
-                  style={{
-                    fontSize: 'clamp(12px, 3vw, 14px)',
-                    color: '#856404',
-                    marginTop: 'clamp(6px, 2vw, 8px)',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                  }}
-                >
-                  {parseFloat(currentPrizeInfo.rolloverAmount).toFixed(4)} KAIA 다음 회차로 이월
-                </p>
-              </div>
+              ))
             ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 'clamp(10px, 3vw, 12px)',
-                }}
-              >
-                {/* 1등 */}
-                {currentPrizeInfo.firstWinners > 0 && (
-                  <div
-                    style={{
-                      padding: 'clamp(12px, 3vw, 15px)',
-                      background: 'linear-gradient(135deg, #FFD700 30%, #FFA500 100%)',
-                      borderRadius: 'clamp(10px, 3vw, 12px)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 'clamp(14px, 3.5vw, 16px)',
-                          fontWeight: '700',
-                          color: '#333',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        🥇 1등 (6개 일치)
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 'clamp(11px, 3vw, 13px)',
-                          color: '#666',
-                          marginTop: 'clamp(3px, 1vw, 4px)',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        {currentPrizeInfo.firstWinners}명 당첨
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 'clamp(16px, 4vw, 18px)',
-                        fontWeight: '700',
-                        color: '#333',
-                        fontFamily: 'SF Pro, Arial, sans-serif',
-                      }}
-                    >
-                      {parseFloat(currentPrizeInfo.firstPrize).toFixed(4)} KAIA
-                    </div>
-                  </div>
-                )}
-
-                {/* 2등 */}
-                {currentPrizeInfo.secondWinners > 0 && (
-                  <div
-                    style={{
-                      padding: 'clamp(12px, 3vw, 15px)',
-                      background: 'linear-gradient(135deg, #C0C0C0 30%, #A9A9A9 100%)',
-                      borderRadius: 'clamp(10px, 3vw, 12px)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 'clamp(14px, 3.5vw, 16px)',
-                          fontWeight: '700',
-                          color: '#333',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        🥈 2등 (5개 일치)
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 'clamp(11px, 3vw, 13px)',
-                          color: '#666',
-                          marginTop: 'clamp(3px, 1vw, 4px)',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        {currentPrizeInfo.secondWinners}명 당첨
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 'clamp(16px, 4vw, 18px)',
-                        fontWeight: '700',
-                        color: '#333',
-                        fontFamily: 'SF Pro, Arial, sans-serif',
-                      }}
-                    >
-                      {parseFloat(currentPrizeInfo.secondPrize).toFixed(4)} KAIA
-                    </div>
-                  </div>
-                )}
-
-                {/* 3등 */}
-                {currentPrizeInfo.thirdWinners > 0 && (
-                  <div
-                    style={{
-                      padding: 'clamp(12px, 3vw, 15px)',
-                      background: 'linear-gradient(135deg, #CD7F32 30%, #A0522D 100%)',
-                      borderRadius: 'clamp(10px, 3vw, 12px)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 'clamp(14px, 3.5vw, 16px)',
-                          fontWeight: '700',
-                          color: 'white',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        🥉 3등 (4개 일치)
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 'clamp(11px, 3vw, 13px)',
-                          color: 'rgba(255,255,255,0.8)',
-                          marginTop: 'clamp(3px, 1vw, 4px)',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        {currentPrizeInfo.thirdWinners}명 당첨
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 'clamp(16px, 4vw, 18px)',
-                        fontWeight: '700',
-                        color: 'white',
-                        fontFamily: 'SF Pro, Arial, sans-serif',
-                      }}
-                    >
-                      {parseFloat(currentPrizeInfo.thirdPrize).toFixed(4)} KAIA
-                    </div>
-                  </div>
-                )}
-              </div>
+              <div style={{ color: '#1A1A1A', fontSize: '14px' }}>당첨 번호 대기 중</div>
             )}
-          </div>
-        )}
 
-        {/* 전체 상금 분배 내역 */}
-        {prizeDistributions.length > 0 && (
-          <div
-            style={{
-              background: 'white',
-              borderRadius: 'clamp(15px, 4vw, 20px)',
-              padding: 'clamp(20px, 5vw, 25px)',
-              marginBottom: 'clamp(80px, 15vh, 100px)',
-            }}
-          >
-            <h3
-              style={{
-                fontSize: 'clamp(16px, 4vw, 18px)',
-                fontWeight: '600',
-                color: '#333',
-                marginBottom: 'clamp(12px, 3vw, 15px)',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              📋 전체 당첨 내역
-            </h3>
-
+            {/* 오른쪽 화살표 */}
             <div
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'clamp(8px, 2vw, 10px)',
-                maxHeight: 'clamp(250px, 50vh, 350px)',
-                overflowY: 'auto',
+                color: 'white',
+                fontSize: '20px',
+                fontWeight: 'bold',
+                margin: '0 5px',
+                cursor: 'pointer',
+                userSelect: 'none',
               }}
             >
-              {prizeDistributions.slice(0, 10).map((dist) => (
-                <div
-                  key={dist.drawId}
-                  style={{
-                    padding: 'clamp(10px, 3vw, 12px)',
-                    background: '#F9F9F9',
-                    borderRadius: 'clamp(8px, 2vw, 10px)',
-                    border: '1px solid #E0E0E0',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: 'clamp(6px, 2vw, 8px)',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 'clamp(13px, 3.5vw, 15px)',
-                        fontWeight: '600',
-                        color: '#333',
-                        fontFamily: 'SF Pro, Arial, sans-serif',
-                      }}
-                    >
-                      회차 #{dist.drawId}
-                    </span>
-                    {parseFloat(dist.rolloverAmount) > 0 ? (
-                      <span
-                        style={{
-                          fontSize: 'clamp(11px, 3vw, 13px)',
-                          color: '#F44336',
-                          fontWeight: '600',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        당첨자 없음
-                      </span>
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: 'clamp(11px, 3vw, 13px)',
-                          color: '#4CAF50',
-                          fontWeight: '600',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        당첨자 {dist.firstWinners + dist.secondWinners + dist.thirdWinners}명
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 'clamp(11px, 3vw, 13px)',
-                      color: '#666',
-                      fontFamily: 'SF Pro, Arial, sans-serif',
-                    }}
-                  >
-                    {parseFloat(dist.rolloverAmount) > 0
-                      ? `이월: ${parseFloat(dist.rolloverAmount).toFixed(4)} KAIA`
-                      : `1등: ${dist.firstWinners}명 | 2등: ${dist.secondWinners}명 | 3등: ${dist.thirdWinners}명`}
-                  </div>
-                </div>
-              ))}
+              &gt;
             </div>
           </div>
-        )}
+        </div>
+
+        {/* 구매 정보 1 */}
+        <div
+          style={{
+            width: '340px',
+            position: 'absolute',
+            top: '570px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            color: 'black',
+            fontSize: '15px',
+            fontWeight: '500',
+            zIndex: 5,
+          }}
+        >
+          <span>구매 장수</span>
+          <span>{myTicketCount}장</span>
+        </div>
+
+        {/* 구매 정보 2 */}
+        <div
+          style={{
+            width: '340px',
+            position: 'absolute',
+            top: '600px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            color: 'black',
+            fontSize: '15px',
+            fontWeight: '500',
+            zIndex: 5,
+          }}
+        >
+          <span>등수</span>
+          <span>{isWinner ? myRank : '-'}</span>
+        </div>
+
+        {/* 당첨자 정보 버튼 */}
+        <button
+          onClick={() => {
+            alert('당첨자 정보 상세 페이지는 개발 예정입니다.');
+          }}
+          style={{
+            width: '360px',
+            height: '55px',
+            position: 'absolute',
+            top: '690px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'linear-gradient(135deg, #530768 0%, #B91189 100%)',
+            borderRadius: '10px',
+            color: 'white',
+            fontSize: '18px',
+            fontWeight: '700',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 5,
+          }}
+        >
+          당첨자 정보
+        </button>
       </div>
     </MobileLayout>
   );
 }
-

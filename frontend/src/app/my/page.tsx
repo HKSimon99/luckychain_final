@@ -2,250 +2,179 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount, useDisconnect } from 'wagmi';
+import { useAppKit } from '@reown/appkit/react';
 import { ethers } from 'ethers';
+import Image from 'next/image';
 import MobileLayout from '@/components/MobileLayout';
-import Header from '@/components/Header';
+import MobileStatusBar from '@/components/MobileStatusBar';
 import * as lottoAbiModule from '@/lib/lotto-abi-full.json';
 
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
 const rpcUrl = 'https://public-en-kairos.node.kaia.io';
 
-interface Ticket {
-  tokenId: number;
-  drawId: number;
-  numbers: number[];
-  isWinner: boolean;
-  matchCount: number;
-  purchaseTime?: number;
-}
-
 export default function MyPage() {
   const router = useRouter();
-  const [address, setAddress] = useState('');
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { open } = useAppKit();
+  
   const [balance, setBalance] = useState('0');
-  const [myTickets, setMyTickets] = useState<Ticket[]>([]);
+  const [totalSpent, setTotalSpent] = useState('0');
+  const [ticketCount, setTicketCount] = useState(0);
+  const [nextDrawDate, setNextDrawDate] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDraw, setSelectedDraw] = useState<number | 'all'>('all');
-  const [ticketPrice, setTicketPrice] = useState('0');
 
-  // 지갑 연결 확인
+  // 지갑 및 데이터 로드
   useEffect(() => {
-    const checkWallet = async () => {
-      if (typeof window.ethereum !== 'undefined') {
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts.length > 0) {
-            setAddress(accounts[0]);
-            
-            // 잔액 조회
-            const balanceHex = await window.ethereum.request({
-              method: 'eth_getBalance',
-              params: [accounts[0], 'latest'],
-            });
-            setBalance((parseInt(balanceHex, 16) / 1e18).toFixed(4));
-            
-            // 티켓 로드
-            await loadMyTickets(accounts[0]);
-          }
-        } catch (error: any) {
-          console.error('❌ 지갑 확인 실패:', error);
-          console.error('❌ 에러 메시지:', error?.message || '알 수 없는 오류');
-          console.error('❌ 에러 스택:', error?.stack);
-        } finally {
-          setIsLoading(false);
+    const loadData = async () => {
+      if (!isConnected || !address) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        console.log('🔍 /my 페이지 데이터 로드 시작');
+
+        // 1. 잔액 조회
+        if (window.ethereum) {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const balanceWei = await provider.getBalance(address);
+          const balanceKAIA = parseFloat(ethers.formatEther(balanceWei)).toFixed(2);
+          setBalance(balanceKAIA);
+          console.log('💰 지갑 잔여:', balanceKAIA, 'KAIA');
         }
-      } else {
+
+        // 2. 컨트랙트 연결
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
+
+        // 3. 티켓 가격
+        const price = await contract.ticketPrice();
+        const ticketPrice = ethers.formatEther(price);
+        console.log('💵 티켓 가격:', ticketPrice, 'KAIA');
+
+        // 4. 다음 추첨 시간 (홈 화면 방식 사용)
+        const currentDrawId = await contract.currentDrawId();
+        console.log('🎯 현재 회차:', Number(currentDrawId));
+        
+        try {
+          // draws는 구조체를 반환하므로 인덱스로 접근
+          const drawData = await contract.draws(currentDrawId);
+          
+          console.log('📦 Draw 원본 데이터:', drawData);
+          console.log('📦 drawData[0] (endTime):', drawData[0]);
+          console.log('📦 drawData[1] (status?):', drawData[1]);
+          
+          // drawData[0]이 endTime (BigInt)
+          const endTime = Number(drawData[0] || 0);
+          
+          console.log('📅 회차 endTime (파싱됨):', endTime);
+          
+          if (endTime > 0) {
+            const date = new Date(endTime * 1000);
+            const formattedDate = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+            setNextDrawDate(formattedDate);
+            console.log('📆 다음 추첨:', formattedDate);
+          } else {
+            // endTime이 0이면 현재 시간 + 7일로 표시 (임시)
+            const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            const formattedDate = `${futureDate.getFullYear()}.${String(futureDate.getMonth() + 1).padStart(2, '0')}.${String(futureDate.getDate()).padStart(2, '0')}`;
+            setNextDrawDate(formattedDate);
+            console.log('📆 다음 추첨 (예상):', formattedDate);
+          }
+        } catch (e) {
+          console.error('⚠️ 회차 정보 조회 실패:', e);
+          setNextDrawDate('-');
+        }
+
+        // 5. 내 티켓 조회 (이벤트 기반)
+        const currentBlock = await provider.getBlockNumber();
+        const fromBlock = Math.max(0, currentBlock - 100000);
+        
+        console.log(`📊 블록 범위: ${fromBlock} ~ ${currentBlock}`);
+        
+        const filter = contract.filters.TicketPurchased(address);
+        const events = await contract.queryFilter(filter, fromBlock, 'latest');
+        
+        const count = events.length;
+        const spent = (count * parseFloat(ticketPrice)).toFixed(2);
+        
+        setTicketCount(count);
+        setTotalSpent(spent);
+        
+        console.log('🎫 구매한 티켓:', count, '장');
+        console.log('💸 누적 참여 금액:', spent, 'KAIA');
+        console.log('✅ /my 페이지 데이터 로드 완료');
+
+      } catch (error) {
+        console.error('❌ 데이터 로드 실패:', error);
+      } finally {
         setIsLoading(false);
       }
     };
 
-    checkWallet();
-  }, []);
+    loadData();
+  }, [address, isConnected]);
 
-  // 내 티켓 로드
-  const loadMyTickets = async (userAddress: string) => {
-    try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
-
-      // 티켓 가격 가져오기
-      const price = await contract.ticketPrice();
-      setTicketPrice(ethers.formatEther(price));
-      console.log('💰 현재 티켓 가격:', ethers.formatEther(price), 'KAIA');
-
-      const currentBlock = await provider.getBlockNumber();
-      // 최근 5000 블록만 조회 (약 2~3시간 분량)
-      const fromBlock = Math.max(0, currentBlock - 5000);
-
-      const filter = contract.filters.TicketPurchased(userAddress);
-      const events = await contract.queryFilter(filter, fromBlock, 'latest');
-      
-      console.log(`✅ 티켓 조회: ${events.length}개 이벤트 발견 (블록 ${fromBlock} ~ ${currentBlock})`);
-
-      const tickets: Ticket[] = [];
-
-      for (const event of events) {
-        const eventLog = event as any; // TypeScript 타입 오류 회피
-        const tokenId = eventLog.args?.ticketId;
-        const drawId = eventLog.args?.drawId;
-        const numbers = eventLog.args?.numbers;
-
-        console.log(`🔍 처리 중 - 티켓ID: ${tokenId}, 회차: ${drawId}`);
-
-        try {
-          const owner = await contract.ownerOf(tokenId);
-          console.log(`   소유자: ${owner}, 내 주소: ${userAddress}`);
-          
-          if (owner.toLowerCase() === userAddress.toLowerCase()) {
-            // 당첨 번호 확인
-            let isWinner = false;
-            let matchCount = 0;
-            try {
-              // winningNumbers(drawId, index) 형태로 접근
-              const winningNums: number[] = [];
-              for (let i = 0; i < 6; i++) {
-                const num = await contract.winningNumbers(drawId, i);
-                winningNums.push(Number(num));
-              }
-              
-              console.log(`   당첨번호 (회차 ${drawId}):`, winningNums);
-
-              if (winningNums[0] > 0) {
-                const ticketNums = numbers.map((n: any) => Number(n));
-                matchCount = ticketNums.filter((num: number) => winningNums.includes(num)).length;
-                isWinner = matchCount >= 4; // 4개 이상 일치
-                console.log(`   내 번호:`, ticketNums, `일치: ${matchCount}개`);
-              } else {
-                console.log(`   당첨번호 없음 (아직 추첨 전)`);
-              }
-            } catch (e: any) {
-              console.log(`   당첨번호 조회 오류:`, e.message);
-            }
-
-            tickets.push({
-              tokenId: Number(tokenId),
-              drawId: Number(drawId),
-              numbers: numbers.map((n: any) => Number(n)),
-              isWinner,
-              matchCount,
-            });
-            
-            console.log(`   ✅ 티켓 추가됨`);
-          } else {
-            console.log(`   ⏭️  다른 소유자의 티켓`);
-          }
-        } catch (error: any) {
-          console.error(`   ❌ 티켓 처리 실패:`, error.message);
-          continue;
-        }
-      }
-
-      setMyTickets(tickets.sort((a, b) => b.drawId - a.drawId));
-      console.log('✅ 티켓 로드 완료:', tickets.length);
-    } catch (error: any) {
-      console.error('❌ 티켓 로드 실패:', error);
-      console.error('❌ 에러 메시지:', error?.message || '알 수 없는 오류');
-      console.error('❌ 에러 코드:', error?.code);
-      console.error('❌ 에러 상세:', JSON.stringify(error, null, 2));
-    }
+  const formatAddress = (addr: string) => {
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
-  // 지갑 연결
-  const connectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      alert('MetaMask를 설치해주세요!');
-      return;
-    }
-
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      setAddress(accounts[0]);
-
-      const balanceHex = await window.ethereum.request({
-        method: 'eth_getBalance',
-        params: [accounts[0], 'latest'],
-      });
-      setBalance((parseInt(balanceHex, 16) / 1e18).toFixed(4));
-
-      await loadMyTickets(accounts[0]);
-    } catch (error: any) {
-      console.error('❌ 지갑 연결 실패:', error);
-      console.error('❌ 에러 메시지:', error?.message || '알 수 없는 오류');
-      alert('지갑 연결에 실패했습니다: ' + (error?.message || '알 수 없는 오류'));
-    }
-  };
-
-  // 필터링된 티켓
-  const filteredTickets =
-    selectedDraw === 'all' ? myTickets : myTickets.filter((t) => t.drawId === selectedDraw);
-
-  // 고유 회차 목록
-  const uniqueDraws = [...new Set(myTickets.map((t) => t.drawId))].sort((a, b) => b - a);
-
-  // 통계
-  const totalSpent = myTickets.length * parseFloat(ticketPrice || '0');
-  const winCount = myTickets.filter((t) => t.isWinner).length;
-
-  // 번호 색상
-  const getNumberColor = (num: number) => {
-    if (num <= 10) return '#FFC107';
-    if (num <= 20) return '#2196F3';
-    if (num <= 30) return '#F44336';
-    if (num <= 40) return '#9E9E9E';
-    return '#4CAF50';
-  };
-
-  if (isLoading) {
+  if (!isConnected) {
     return (
       <MobileLayout>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          <p style={{ color: 'white', fontSize: 'clamp(14px, 3.5vw, 16px)' }}>로딩 중...</p>
+        <div
+          style={{
+            width: '100%',
+            height: '100vh',
+            background: '#380D44',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+          }}
+        >
+          <div style={{ fontSize: '20px', marginBottom: '20px' }}>🔒</div>
+          <div style={{ fontSize: '16px', marginBottom: '30px' }}>지갑을 연결해주세요</div>
+          <button
+            onClick={() => router.push('/wallet')}
+            style={{
+              padding: '12px 24px',
+              background: '#93EE00',
+              color: '#000',
+              border: 'none',
+              borderRadius: '10px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            지갑 연결하기
+          </button>
         </div>
       </MobileLayout>
     );
   }
 
-  if (!address) {
+  if (isLoading) {
     return (
-      <MobileLayout showBottomNav={false}>
+      <MobileLayout>
         <div
           style={{
+            width: '100%',
+            height: '100vh',
+            background: '#380D44',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            height: '100%',
-            padding: 'clamp(20px, 5vw, 30px)',
+            color: 'white',
+            fontSize: '16px',
           }}
         >
-          <h2
-            style={{
-              fontSize: 'clamp(20px, 5vw, 24px)',
-              fontWeight: '700',
-              color: 'white',
-              marginBottom: 'clamp(15px, 4vw, 20px)',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            지갑을 연결해주세요
-          </h2>
-          <button
-            onClick={connectWallet}
-            style={{
-              padding: 'clamp(12px, 3vw, 15px) clamp(30px, 7vw, 40px)',
-              background: 'linear-gradient(135deg, #93EE00 0%, #7BC800 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'clamp(10px, 3vw, 12px)',
-              fontSize: 'clamp(14px, 3.5vw, 16px)',
-              fontWeight: '600',
-              cursor: 'pointer',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            🦊 MetaMask 연결
-          </button>
+          로딩 중...
         </div>
       </MobileLayout>
     );
@@ -253,328 +182,332 @@ export default function MyPage() {
 
   return (
     <MobileLayout>
-      <Header />
-      
-      {/* 메인 콘텐츠 */}
       <div
         style={{
-          flex: 1,
-          padding: 'clamp(15px, 4vw, 20px)',
-          overflow: 'auto',
+          width: '100vw',
+          height: '100vh',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          background: '#380D44',
+          overflow: 'hidden',
+          fontFamily: 'SF Pro, Arial, sans-serif',
         }}
       >
-        {/* 지갑 정보 */}
+      {/* 상단바 영역 (보라색 배경) */}
+      <MobileStatusBar />
+
+      {/* 헤더 (흰색 배경) */}
+      <div
+        style={{
+          width: '100%',
+          height: '49px',
+          paddingLeft: '18px',
+          paddingRight: '18px',
+          background: 'white',
+          borderBottom: '1px solid #380D44',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        {/* 로고 */}
+        <div
+          onClick={() => router.push('/')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            cursor: 'pointer',
+          }}
+        >
+          <Image
+            src="/logo.png"
+            alt="Luckychain"
+            width={37}
+            height={37}
+            style={{ width: '37px', height: '37px' }}
+          />
+          <div style={{ fontSize: '15px', fontWeight: '600', color: '#000' }}>
+            Luckychain
+          </div>
+        </div>
+
+        {/* 햄버거 메뉴 */}
+        <div
+          onClick={() => router.push('/admin')}
+          style={{
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <div style={{ width: '24px', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
+          <div style={{ width: '24px', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
+          <div style={{ width: '24px', height: '2px', background: '#1E293B', borderRadius: '2px' }} />
+        </div>
+      </div>
+
+      {/* 프로필 박스 */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '109px',
+          left: 0,
+          right: 0,
+          width: '100%',
+          paddingLeft: '18px',
+          paddingRight: '18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+        {/* 프로필 이미지 */}
         <div
           style={{
-            background: 'linear-gradient(135deg, #6B46C1 0%, #9333EA 100%)',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(20px, 5vw, 25px)',
+            width: '59px',
+            height: '59px',
+            borderRadius: '50%',
+            border: '1px solid #EDEDED',
+            overflow: 'hidden',
+            background: 'url(https://cdn-icons-png.flaticon.com/512/3135/3135715.png) center/cover no-repeat',
+          }}
+        />
+
+        {/* 사용자 정보 */}
+        <div style={{ marginLeft: '20px' }}>
+          <div style={{ color: 'white', fontSize: '22px', fontWeight: '700' }}>
+            {address ? formatAddress(address) : '사용자명'}
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.63)', fontSize: '16px', fontWeight: '200' }}>
+            지갑 연결됨
+          </div>
+        </div>
+        </div>
+
+        {/* 지갑 선택 버튼 */}
+        <button
+          onClick={() => open()}
+          style={{
+            border: '1px solid white',
+            borderRadius: '10px',
+            padding: '8px 12px',
             color: 'white',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
+            fontSize: '11px',
+            background: 'transparent',
+            cursor: 'pointer',
           }}
         >
-          <div
-            style={{
-              fontSize: 'clamp(12px, 3vw, 14px)',
-              marginBottom: 'clamp(8px, 2vw, 10px)',
-              opacity: 0.8,
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            내 지갑
-          </div>
-          <div
-            style={{
-              fontSize: 'clamp(14px, 3.5vw, 16px)',
-              fontWeight: '600',
-              marginBottom: 'clamp(12px, 3vw, 15px)',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            {address.slice(0, 6)}...{address.slice(-4)}
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              paddingTop: 'clamp(12px, 3vw, 15px)',
-              borderTop: '1px solid rgba(255,255,255,0.2)',
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: 'clamp(11px, 3vw, 13px)',
-                  opacity: 0.7,
-                  marginBottom: 'clamp(4px, 1vw, 5px)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                잔액
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(16px, 4vw, 18px)',
-                  fontWeight: '700',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                {balance} KAIA
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div
-                style={{
-                  fontSize: 'clamp(11px, 3vw, 13px)',
-                  opacity: 0.7,
-                  marginBottom: 'clamp(4px, 1vw, 5px)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                총 구매
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(16px, 4vw, 18px)',
-                  fontWeight: '700',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                {myTickets.length}장
-              </div>
-            </div>
-          </div>
-        </div>
+          지갑 선택
+        </button>
+      </div>
 
-        {/* 통계 카드 */}
+      {/* 구매한 복권 리스트 버튼 */}
+      <button
+        onClick={() => router.push('/my/list')}
+        style={{
+          width: 'calc(100% - 36px)',
+          height: '56px',
+          background: '#BDDF28',
+          borderRadius: '10px',
+          position: 'absolute',
+          top: '209px',
+          left: '18px',
+          right: '18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'black',
+          fontSize: '15px',
+          fontWeight: '500',
+          border: 'none',
+          cursor: 'pointer',
+        }}
+      >
+        구매한 복권 리스트
+      </button>
+
+      {/* 구분선 1 */}
+      <div
+        style={{
+          width: 'calc(100% - 36px)',
+          height: '1px',
+          background: 'rgba(255,255,255,0.5)',
+          position: 'absolute',
+          top: '288px',
+          left: '18px',
+          right: '18px',
+        }}
+      />
+
+      {/* 2x2 카드 그리드 */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '314px',
+          left: '18px',
+          right: '18px',
+          width: 'calc(100% - 36px)',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '22px',
+        }}
+      >
+        {/* 카드 1: 지갑 잔여 */}
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: 'clamp(10px, 3vw, 12px)',
-            marginBottom: 'clamp(15px, 4vw, 20px)',
+            height: '73px',
+            background: 'rgba(91, 50, 152, 0.63)',
+            borderRadius: '10px',
+            padding: '10px 10px 10px 20px',
+            color: 'white',
+            fontSize: '13px',
+            fontWeight: '700',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
           }}
         >
-          <div
-            style={{
-              background: 'white',
-              borderRadius: 'clamp(12px, 3vw, 15px)',
-              padding: 'clamp(15px, 4vw, 18px)',
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 'clamp(11px, 3vw, 13px)',
-                color: '#666',
-                marginBottom: 'clamp(6px, 2vw, 8px)',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              총 사용액
-            </div>
-            <div
-              style={{
-                fontSize: 'clamp(18px, 4.5vw, 20px)',
-                fontWeight: '700',
-                color: '#333',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              {totalSpent.toFixed(2)} KAIA
-            </div>
-          </div>
-          <div
-            style={{
-              background: 'white',
-              borderRadius: 'clamp(12px, 3vw, 15px)',
-              padding: 'clamp(15px, 4vw, 18px)',
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 'clamp(11px, 3vw, 13px)',
-                color: '#666',
-                marginBottom: 'clamp(6px, 2vw, 8px)',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              당첨 횟수
-            </div>
-            <div
-              style={{
-                fontSize: 'clamp(18px, 4.5vw, 20px)',
-                fontWeight: '700',
-                color: winCount > 0 ? '#4CAF50' : '#333',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              {winCount}회 {winCount > 0 ? '🎉' : ''}
-            </div>
+          <div>지갑 잔여</div>
+          <div style={{ marginTop: '5px', fontSize: '16px', fontWeight: '400' }}>
+            {balance} KAIA
           </div>
         </div>
 
-        {/* 내 티켓 목록 */}
+        {/* 카드 2: 누적 참여 금액 */}
         <div
           style={{
-            background: 'white',
-            borderRadius: 'clamp(15px, 4vw, 20px)',
-            padding: 'clamp(15px, 4vw, 20px)',
-            marginBottom: 'clamp(80px, 15vh, 100px)',
+            height: '73px',
+            background: 'rgba(114, 63, 94, 0.61)',
+            borderRadius: '10px',
+            padding: '10px 10px 10px 20px',
+            color: 'white',
+            fontSize: '13px',
+            fontWeight: '700',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 'clamp(12px, 3vw, 15px)',
-            }}
-          >
-            <h3
-              style={{
-                fontSize: 'clamp(16px, 4vw, 18px)',
-                fontWeight: '600',
-                color: '#333',
-                fontFamily: 'SF Pro, Arial, sans-serif',
-              }}
-            >
-              내 티켓 ({myTickets.length}장)
-            </h3>
-
-            {/* 회차 필터 */}
-            {uniqueDraws.length > 0 && (
-              <select
-                value={selectedDraw}
-                onChange={(e) =>
-                  setSelectedDraw(e.target.value === 'all' ? 'all' : Number(e.target.value))
-                }
-                style={{
-                  padding: 'clamp(6px, 2vw, 8px) clamp(10px, 3vw, 12px)',
-                  borderRadius: 'clamp(6px, 2vw, 8px)',
-                  border: '1px solid #E0E0E0',
-                  fontSize: 'clamp(12px, 3vw, 14px)',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
-                }}
-              >
-                <option value="all">전체</option>
-                {uniqueDraws.map((draw) => (
-                  <option key={draw} value={draw}>
-                    회차 #{draw}
-                  </option>
-                ))}
-              </select>
-            )}
+          <div>누적 참여 금액</div>
+          <div style={{ marginTop: '5px', fontSize: '16px', fontWeight: '400' }}>
+            {totalSpent} KAIA
           </div>
-
-          {filteredTickets.length === 0 ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: 'clamp(30px, 8vw, 40px)',
-                color: '#999',
-              }}
-            >
-              <p style={{ fontSize: 'clamp(14px, 3.5vw, 16px)' }}>
-                {myTickets.length === 0 ? '아직 구매한 티켓이 없습니다' : '이 회차에 티켓이 없습니다'}
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(10px, 3vw, 12px)' }}>
-              {filteredTickets.map((ticket) => (
-                <div
-                  key={ticket.tokenId}
-                  style={{
-                    padding: 'clamp(12px, 3vw, 15px)',
-                    borderRadius: 'clamp(10px, 3vw, 12px)',
-                    border: ticket.isWinner ? '2px solid #4CAF50' : '1px solid #E0E0E0',
-                    background: ticket.isWinner ? '#E8F5E9' : '#F9F9F9',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: 'clamp(8px, 2vw, 10px)',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 'clamp(11px, 3vw, 13px)',
-                        color: '#666',
-                        fontFamily: 'SF Pro, Arial, sans-serif',
-                      }}
-                    >
-                      티켓 #{ticket.tokenId}
-                    </span>
-                    <div style={{ display: 'flex', gap: 'clamp(6px, 2vw, 8px)' }}>
-                      <span
-                        style={{
-                          fontSize: 'clamp(10px, 2.5vw, 12px)',
-                          padding: 'clamp(3px, 1vw, 4px) clamp(8px, 2vw, 10px)',
-                          background: '#2196F3',
-                          color: 'white',
-                          borderRadius: 'clamp(10px, 3vw, 12px)',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                        }}
-                      >
-                        회차 {ticket.drawId}
-                      </span>
-                      {ticket.matchCount >= 4 && (
-                        <span
-                          style={{
-                            fontSize: 'clamp(10px, 2.5vw, 12px)',
-                            padding: 'clamp(3px, 1vw, 4px) clamp(8px, 2vw, 10px)',
-                            background: ticket.matchCount === 6 ? '#FFC107' : '#4CAF50',
-                            color: 'white',
-                            borderRadius: 'clamp(10px, 3vw, 12px)',
-                            fontWeight: '600',
-                            fontFamily: 'SF Pro, Arial, sans-serif',
-                          }}
-                        >
-                          {ticket.matchCount === 6 ? '🥇 1등' : ticket.matchCount === 5 ? '🥈 2등' : '🥉 3등'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 'clamp(6px, 2vw, 8px)',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {ticket.numbers.map((num, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          width: 'clamp(35px, 9vw, 42px)',
-                          height: 'clamp(35px, 9vw, 42px)',
-                          borderRadius: '50%',
-                          background: getNumberColor(num),
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 'clamp(14px, 3.5vw, 16px)',
-                          fontWeight: '700',
-                          fontFamily: 'SF Pro, Arial, sans-serif',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                        }}
-                      >
-                        {num}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
+
+        {/* 카드 3: 다음 추첨 */}
+        <div
+          style={{
+            height: '73px',
+            background: 'rgba(123, 55, 102, 0.71)',
+            borderRadius: '10px',
+            padding: '10px 10px 10px 20px',
+            color: 'white',
+            fontSize: '13px',
+            fontWeight: '700',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
+          <div>다음 추첨</div>
+          <div style={{ marginTop: '5px', fontSize: '16px', fontWeight: '400' }}>
+            {nextDrawDate || '-'}
+          </div>
+        </div>
+
+        {/* 카드 4: 참여 횟수 */}
+        <div
+          style={{
+            height: '73px',
+            background: 'rgba(60, 69, 122, 0.78)',
+            borderRadius: '10px',
+            padding: '10px 10px 10px 20px',
+            color: 'white',
+            fontSize: '13px',
+            fontWeight: '700',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
+          <div>참여 횟수</div>
+          <div style={{ marginTop: '5px', fontSize: '16px', fontWeight: '400' }}>
+            {ticketCount}
+          </div>
+        </div>
+      </div>
+
+      {/* 구분선 2 */}
+      <div
+        style={{
+          width: 'calc(100% - 36px)',
+          height: '1px',
+          background: 'rgba(255,255,255,0.5)',
+          position: 'absolute',
+          top: '512px',
+          left: '18px',
+          right: '18px',
+        }}
+      />
+
+      {/* 버튼 1: 회차별 당첨자 정보 */}
+      <button
+        onClick={() => router.push('/result')}
+        style={{
+          width: 'calc(100% - 36px)',
+          height: '53px',
+          position: 'absolute',
+          top: '545px',
+          left: '18px',
+          right: '18px',
+          background: 'linear-gradient(136deg, #700B8C 0%, #B91189 100%)',
+          borderRadius: '10px',
+          color: 'white',
+          border: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '15px',
+          fontWeight: '500',
+          cursor: 'pointer',
+        }}
+      >
+        회차별 당첨자 정보
+      </button>
+
+      {/* 버튼 2: 보상 수령 내역 */}
+      <button
+        onClick={() => {
+          alert('보상 수령 내역 페이지는 개발 예정입니다.');
+        }}
+        style={{
+          width: 'calc(100% - 36px)',
+          height: '53px',
+          position: 'absolute',
+          top: '620px',
+          left: '18px',
+          right: '18px',
+          background: 'linear-gradient(136deg, #700B8C 0%, #B91189 100%)',
+          borderRadius: '10px',
+          color: 'white',
+          border: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '15px',
+          fontWeight: '500',
+          cursor: 'pointer',
+        }}
+      >
+        보상 수령 내역
+      </button>
+
+      {/* 하단 네비게이션은 MobileLayout에서 자동 표시됨 */}
       </div>
     </MobileLayout>
   );
 }
-
