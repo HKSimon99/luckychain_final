@@ -104,8 +104,8 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, []);
 
-  // KAIA 실시간 가격 가져오기
-  const { kaiaPrice } = useKaiaPrice();
+  // KAIA 실시간 가격 및 24시간 변동률 가져오기
+  const { kaiaPrice, change24h } = useKaiaPrice();
   
   // 총 상금 계산 (prizePool + accumulatedJackpot)
   const totalPrize = (parseFloat(prizePool) + parseFloat(accumulatedJackpot)).toFixed(0);
@@ -141,27 +141,14 @@ export default function HomePage() {
         <div
           style={{
             padding: '0 3vw',
+            marginTop: '3.5vh',
           }}
         >
-          {/* 현재 회차 진행중 표시 */}
-          <div
-            style={{
-              textAlign: 'center',
-              marginBottom: '1.5vh',
-              fontSize: 'clamp(13px, 3.3vw, 15px)',
-              fontWeight: '600',
-              color: '#FFFFFF',
-              fontFamily: 'SF Pro, Arial, sans-serif',
-            }}
-          >
-            현재 {currentDrawId}회차 진행중
-      </div>
-
           <div
             style={{
               background: '#FFFFFF',
               borderRadius: '2vw',
-              padding: '2.5vh 3vw',
+              padding: '1.8vh 3vw',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             }}
           >
@@ -292,31 +279,32 @@ export default function HomePage() {
         <div
           style={{
             padding: '0 3vw',
+            marginTop: '1vh',
           }}
         >
           <div
             style={{
               background: 'linear-gradient(135deg, #6B0F70 0%, #4A0E68 100%)',
               borderRadius: '2vw',
-              padding: '3vh 3vw',
+              padding: '2.3vh 3vw',
               border: '0.5px solid rgba(255, 255, 255, 0.3)',
               textAlign: 'center',
             }}
           >
             {/* 타이틀 */}
-            <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', marginBottom: '2vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+            <div style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', fontWeight: '700', color: '#FFF', marginBottom: '1.5vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
             {currentDrawId}회차 누적 상금
               </div>
 
             {/* 메인 금액 */}
-            <div style={{ marginBottom: '1.5vh' }}>
+            <div style={{ marginBottom: '1vh' }}>
               <div style={{ fontSize: 'clamp(28px, 7vw, 36px)', fontWeight: '700', color: '#93EE00', letterSpacing: '0.02em', fontFamily: 'SF Pro, Arial, sans-serif', lineHeight: '1.2' }}>
                 {parseInt(totalPrize).toLocaleString()} KAIA
               </div>
             </div>
 
             {/* 원화 */}
-            <div style={{ fontSize: 'clamp(14px, 3.5vw, 18px)', fontWeight: '600', color: '#FFD700', marginBottom: '2.5vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+            <div style={{ fontSize: 'clamp(14px, 3.5vw, 18px)', fontWeight: '600', color: '#FFD700', marginBottom: '1.8vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
               ₩{totalPrizeKRW}
               </div>
 
@@ -337,17 +325,19 @@ export default function HomePage() {
         <div
           style={{
             padding: '0 3vw',
+            marginTop: '1vh',
+            marginBottom: '1.5vh',
           }}
         >
           <div
             style={{
               background: 'linear-gradient(292deg, #6E0058 6.55%, #450058 65.52%)',
               borderRadius: '2vw',
-              padding: '2.5vh 3vw',
+              padding: '2vh 3vw',
               border: '0.5px solid #FFFFFF',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2vh' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5vh' }}>
               {/* 왼쪽: 코인 아이콘 + 이름 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '2vw' }}>
                 <div style={{ width: '10vw', height: '10vw', position: 'relative' }}>
@@ -373,14 +363,25 @@ export default function HomePage() {
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 'clamp(13px, 3.3vw, 15px)', fontWeight: '700', color: '#FFF', fontFamily: 'SF Pro, Arial, sans-serif' }}>
                   {ticketPrice} KAIA
-                      </div>
-                <div style={{ fontSize: 'clamp(10px, 2.5vw, 11px)', fontWeight: '700', color: '#34D055', marginTop: 'clamp(2px, 0.5vw, 3px)', fontFamily: 'SF Pro, Arial, sans-serif' }}>
-                  +1.8%
-                            </div>
-                        </div>
-                      </div>
+                </div>
+                <div style={{ fontSize: 'clamp(9px, 2.3vw, 10px)', color: '#E0E0E0', marginTop: '0.3vh', fontFamily: 'SF Pro, Arial, sans-serif' }}>
+                  ≈ {(parseFloat(ticketPrice) * kaiaPrice).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}원
+                </div>
+                <div 
+                  style={{ 
+                    fontSize: 'clamp(9px, 2.2vw, 10px)', 
+                    fontWeight: '600', 
+                    color: change24h > 0 ? '#34D055' : change24h < 0 ? '#FF3B30' : '#8E8E93',
+                    marginTop: '0.3vh', 
+                    fontFamily: 'SF Pro, Arial, sans-serif' 
+                  }}
+                >
+                  24시간 {change24h > 0 ? '▲' : change24h < 0 ? '▼' : '—'} {change24h > 0 ? '+' : ''}{change24h.toFixed(2)}%
+                </div>
+              </div>
+                </div>
 
-            <div style={{ height: '0.3px', background: '#FFF', marginBottom: '2vh' }} />
+            <div style={{ height: '0.3px', background: '#FFF', marginBottom: '1.5vh' }} />
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>

@@ -71,7 +71,9 @@ export default function LotteryListPage() {
         const filter = contract.filters.TicketPurchased(address);
         const events = await contract.queryFilter(filter, fromBlock, 'latest');
 
-        console.log(`📊 발견된 티켓: ${events.length}개 (블록 ${fromBlock} ~ ${currentBlock})`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`📊 발견된 티켓: ${events.length}개`);
+        }
 
         const loadedTickets: Ticket[] = [];
 
@@ -194,10 +196,9 @@ export default function LotteryListPage() {
           return b.tokenId - a.tokenId;  // 같은 회차면 최신 티켓 먼저
         });
         
-        console.log(`✅ 총 ${loadedTickets.length}개 티켓 로드 완료`);
-        console.log(`  - 당첨: ${loadedTickets.filter(t => t.status === '당첨').length}개`);
-        console.log(`  - 낙첨: ${loadedTickets.filter(t => t.status === '낙첨').length}개`);
-        console.log(`  - 대기중: ${loadedTickets.filter(t => t.status === '대기중').length}개`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ 총 ${loadedTickets.length}개 티켓 (당첨:${loadedTickets.filter(t => t.status === '당첨').length}, 낙첨:${loadedTickets.filter(t => t.status === '낙첨').length}, 대기:${loadedTickets.filter(t => t.status === '대기중').length})`);
+        }
         
         setTickets(loadedTickets);
         setFilteredTickets(loadedTickets);
@@ -281,97 +282,105 @@ export default function LotteryListPage() {
     <div
       style={{
         width: '100%',
-        minHeight: '100vh',
         height: '100vh',
         background: '#380D44',
-        overflow: 'auto',
-        position: 'relative',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
+      {/* 상단 고정 영역 */}
       <div
         style={{
-          paddingBottom: 'clamp(100px, 20vh, 120px)',
+          flexShrink: 0,
         }}
       >
-      {/* 상단 상태바 */}
-      <MobileStatusBar />
+        {/* 상단 상태바 */}
+        <MobileStatusBar />
 
-      {/* 뒤로가기 + 제목 */}
-      <div
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: 'clamp(15px, 4vw, 20px)',
-          position: 'relative',
-          padding: '0 clamp(18px, 4.5vw, 20px)',
-        }}
-      >
-        {/* 뒤로가기 */}
+        {/* 뒤로가기 + 제목 */}
         <div
-          onClick={() => router.back()}
           style={{
-            position: 'absolute',
-            left: 'clamp(18px, 4.5vw, 20px)',
-            cursor: 'pointer',
-            fontSize: 'clamp(18px, 4.5vw, 20px)',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 'clamp(15px, 4vw, 20px)',
+            position: 'relative',
+            padding: '0 clamp(18px, 4.5vw, 20px)',
           }}
         >
-          ←
-        </div>
-
-        {/* 제목 */}
-        <span
-          style={{
-            color: 'white',
-            fontSize: 'clamp(14px, 3.5vw, 15px)',
-            fontWeight: '700',
-            fontFamily: 'SF Pro, Arial, sans-serif',
-          }}
-        >
-          복권 리스트
-        </span>
-      </div>
-
-      {/* 탭 버튼 */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 'clamp(8px, 2vw, 10px)',
-          padding: '0 clamp(18px, 4.5vw, 20px)',
-          marginTop: 'clamp(50px, 12.5vw, 70px)',
-          marginBottom: 'clamp(30px, 7.5vw, 40px)',
-        }}
-      >
-        {(['전체', '당첨', '낙첨'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setSelectedTab(tab)}
+          {/* 뒤로가기 */}
+          <div
+            onClick={() => router.back()}
             style={{
-              flex: 1,
-              height: 'clamp(36px, 9vw, 40px)',
-              background: selectedTab === tab
-                ? 'linear-gradient(136deg, #530768 0%, #B91189 100%)'
-                : 'rgba(255,255,255,0.3)',
-              borderRadius: 'clamp(8px, 2vw, 10px)',
-              border: 'none',
-              color: 'white',
-              fontWeight: '700',
-              fontSize: 'clamp(13px, 3.3vw, 14px)',
+              position: 'absolute',
+              left: 'clamp(18px, 4.5vw, 20px)',
               cursor: 'pointer',
+              fontSize: 'clamp(18px, 4.5vw, 20px)',
+            }}
+          >
+            ←
+          </div>
+
+          {/* 제목 */}
+          <span
+            style={{
+              color: 'white',
+              fontSize: 'clamp(14px, 3.5vw, 15px)',
+              fontWeight: '700',
               fontFamily: 'SF Pro, Arial, sans-serif',
             }}
           >
-            {tab}
-          </button>
-        ))}
+            복권 리스트
+          </span>
+        </div>
+
+        {/* 탭 버튼 */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 'clamp(8px, 2vw, 10px)',
+            padding: '0 clamp(18px, 4.5vw, 20px)',
+            marginTop: 'clamp(50px, 12.5vw, 70px)',
+            marginBottom: 'clamp(20px, 5vw, 25px)',
+          }}
+        >
+          {(['전체', '당첨', '낙첨'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setSelectedTab(tab)}
+              style={{
+                flex: 1,
+                height: 'clamp(36px, 9vw, 40px)',
+                background: selectedTab === tab
+                  ? 'linear-gradient(136deg, #530768 0%, #B91189 100%)'
+                  : 'rgba(255,255,255,0.3)',
+                borderRadius: 'clamp(8px, 2vw, 10px)',
+                border: 'none',
+                color: 'white',
+                fontWeight: '700',
+                fontSize: 'clamp(13px, 3.3vw, 14px)',
+                cursor: 'pointer',
+                fontFamily: 'SF Pro, Arial, sans-serif',
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* 티켓 카드 리스트 */}
+      {/* 티켓 카드 리스트 - 스크롤 영역 */}
       <div
         style={{
+          flex: 1,
+          overflow: 'auto',
           padding: '0 clamp(18px, 4.5vw, 20px)',
+          paddingBottom: 'clamp(20px, 5vh, 30px)',
         }}
       >
         {filteredTickets.length === 0 ? (
@@ -555,7 +564,6 @@ export default function LotteryListPage() {
             </div>
           ))
         )}
-      </div>
       </div>
     </div>
   );

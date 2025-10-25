@@ -445,10 +445,20 @@ export default function BuyTicketPage() {
                 fontWeight: 600,
                 color: '#FFD900',
                 marginTop: '0.5vh',
+                alignItems: 'baseline',
               }}
             >
               <span>티켓 가격</span>
-              <span>{(quantity * parseFloat(ticketPrice)).toFixed(1)} KAIA</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3vh' }}>
+                <span>{(quantity * parseFloat(ticketPrice)).toFixed(1)} KAIA</span>
+                <span style={{ 
+                  fontSize: 'clamp(9px, 2.2vw, 10px)', 
+                  fontWeight: 500,
+                  color: '#E0E0E0' 
+                }}>
+                  ≈ {(quantity * parseFloat(ticketPrice) * kaiaPrice).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}원
+                </span>
+              </div>
             </div>
           </div>
 

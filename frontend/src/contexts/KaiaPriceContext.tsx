@@ -1,10 +1,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getKaiaPrice } from '@/lib/kaiaPrice';
+import { getKaiaPrice, type KaiaPriceData } from '@/lib/kaiaPrice';
 
 interface KaiaPriceContextType {
   kaiaPrice: number;
+  change24h: number;
   isLoading: boolean;
   error: string | null;
   lastUpdated: Date | null;
@@ -14,11 +15,16 @@ interface KaiaPriceContextType {
 const KaiaPriceContext = createContext<KaiaPriceContextType | undefined>(undefined);
 
 /**
- * KAIA 가격을 전역으로 관리하는 Provider
- * 전체 앱에서 단 한 번만 API를 호출하여 모든 컴포넌트가 공유
+ * KAIA 가격 및 24시간 변동률을 전역으로 관리하는 Provider
+ * 
+ * 최적화:
+ * - 60초마다 자동 업데이트 (Rate Limit 방지)
+ * - API Route의 캐시와 협력
+ * - 탭 포커스 시 자동 갱신
  */
 export function KaiaPriceProvider({ children }: { children: ReactNode }) {
   const [kaiaPrice, setKaiaPrice] = useState<number>(155); // 기본값
+  const [change24h, setChange24h] = useState<number>(0); // 24시간 변동률
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -26,9 +32,18 @@ export function KaiaPriceProvider({ children }: { children: ReactNode }) {
   const fetchPrice = async () => {
     try {
       setError(null);
-      const price = await getKaiaPrice();
-      setKaiaPrice(price);
-      setLastUpdated(new Date());
+      const data: KaiaPriceData = await getKaiaPrice();
+      
+      // 값이 유효한 경우에만 업데이트
+      if (data.price > 0) {
+        setKaiaPrice(data.price);
+        setChange24h(data.change24h);
+        setLastUpdated(new Date());
+        // 개발 환경에서만 로그 출력
+        if (process.env.NODE_ENV === 'development') {
+          console.log('💰 KAIA:', data.price, 'KRW, 변동:', data.change24h.toFixed(2) + '%');
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch price');
       console.error('❌ KAIA 가격 조회 실패:', err);
@@ -38,16 +53,39 @@ export function KaiaPriceProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // 고정 환율 사용 - API 호출 불필요
+    // 초기 로드
     fetchPrice();
     
-    // interval 제거 - 고정값이므로 업데이트 불필요
-  }, []);
+    // 60초마다 자동 업데이트 (Rate Limit 방지)
+    const interval = setInterval(fetchPrice, 60000);
+    
+    // 탭이 포커스 받을 때 갱신 (최신 가격 유지)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const timeSinceLastUpdate = lastUpdated 
+          ? Date.now() - lastUpdated.getTime() 
+          : Infinity;
+        
+        // 마지막 업데이트가 60초 이상 경과했으면 갱신
+        if (timeSinceLastUpdate > 60000) {
+          fetchPrice();
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [lastUpdated]);
 
   return (
     <KaiaPriceContext.Provider
       value={{
         kaiaPrice,
+        change24h,
         isLoading,
         error,
         lastUpdated,

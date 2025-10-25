@@ -62,10 +62,9 @@ export default function AdminPage() {
           const isOwnerWallet = wagmiAddress.toLowerCase() === owner.toLowerCase();
           setIsOwner(isOwnerWallet);
           
-          console.log('📋 컨트랙트 주소:', contractAddress);
-          console.log('👤 컨트랙트 Owner:', owner);
-          console.log('🔑 현재 지갑:', wagmiAddress);
-          console.log('✅ Owner 권한:', isOwnerWallet);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📋 Admin 체크:', { contractAddress, owner, wagmiAddress, isOwner: isOwnerWallet });
+          }
 
           // 컨트랙트 데이터 로드
           await loadContractData();
@@ -94,8 +93,12 @@ export default function AdminPage() {
       setAccumulatedJackpot(ethers.formatEther(jackpot));
       setCurrentTicketPrice(ethers.formatEther(ticketPrice));
 
-      console.log('✅ 컨트랙트 데이터 로드 완료');
-      console.log('💰 현재 티켓 가격:', ethers.formatEther(ticketPrice), 'KAIA');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Admin 데이터 로드:', { 
+          currentDrawId: Number(currentDraw), 
+          ticketPrice: ethers.formatEther(ticketPrice) + ' KAIA' 
+        });
+      }
     } catch (error) {
       console.error('컨트랙트 데이터 로드 실패:', error);
     }

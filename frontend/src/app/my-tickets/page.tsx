@@ -33,16 +33,12 @@ export default function MyTicketsPage() {
   useEffect(() => {
     const loadMyTickets = async () => {
       if (!isConnected || !address) {
-        console.log('❌ 지갑이 연결되지 않음');
         setIsLoading(false);
         return;
       }
 
-      console.log('🔍 티켓 조회 시작:', address);
-
       // 최근 구매한 트랜잭션 해시 확인
       const recentTxHash = sessionStorage.getItem('recentPurchaseTxHash');
-      console.log('💾 저장된 트랜잭션 해시:', recentTxHash);
 
       try {
         // ✅ Reown AppKit 패턴: walletProvider 사용 (모바일 지원)
@@ -53,18 +49,12 @@ export default function MyTicketsPage() {
         const provider = new ethers.BrowserProvider(walletProvider as any);
         const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
 
-        console.log('📡 컨트랙트 연결됨:', contractAddress);
-
         // TicketPurchased 이벤트로 내 티켓 조회 (최근 100,000 블록)
         const currentBlock = await provider.getBlockNumber();
         const fromBlock = Math.max(0, currentBlock - 100000);
         
         const filter = contract.filters.TicketPurchased(address);
-        console.log('🔎 이벤트 필터:', filter);
-        console.log(`📊 블록 범위: ${fromBlock} ~ ${currentBlock}`);
-
         const events = await contract.queryFilter(filter, fromBlock, 'latest');
-        console.log(`📊 발견된 이벤트: ${events.length}개`);
 
         const tickets: Ticket[] = [];
         
@@ -100,18 +90,13 @@ export default function MyTicketsPage() {
               drawId = Number(eventData.args.drawId || eventData.args[2]);
             }
 
-            console.log(`🎫 티켓 #${tokenId} (회차: ${drawId}) 처리 중...`);
-
             // 소유권 확인
             try {
               const owner = await contract.ownerOf(tokenId);
-              console.log(`  소유자: ${owner}`);
               if (owner.toLowerCase() !== address.toLowerCase()) {
-                console.log(`  ⚠️ 다른 소유자의 티켓 - 스킵`);
                 continue;
               }
             } catch (e) {
-              console.log(`  ⚠️ 소유권 확인 실패 - 스킵`);
               continue;
             }
 
@@ -123,7 +108,6 @@ export default function MyTicketsPage() {
               // args[3]이 numbers 배열
               numbers = Array.from(eventData.args[3] as any).map((n: any) => Number(n));
             }
-            console.log(`  번호: [${numbers.join(', ')}]`);
 
             // 블록 타임스탬프
             const block = await provider.getBlock(eventData.blockNumber);
@@ -141,14 +125,17 @@ export default function MyTicketsPage() {
               drawEndTime,
             });
 
-            console.log(`  ✅ 티켓 #${tokenId} 추가됨`);
           } catch (error) {
             console.error(`  ❌ 티켓 처리 실패:`, error);
           }
         }
 
         tickets.sort((a, b) => b.tokenId - a.tokenId);
-        console.log(`🎉 총 ${tickets.length}개 티켓 로드 완료`);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🎉 최근 구매 티켓: ${tickets.length}개`);
+        }
+        
         setMyTickets(tickets);
         
         // 티켓 표시 완료 후 세션 스토리지 클리어 (재방문 시 전체 보기)
