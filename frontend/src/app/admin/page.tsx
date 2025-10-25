@@ -52,24 +52,23 @@ export default function AdminPage() {
         try {
           setAddress(wagmiAddress);
 
-            // 컨트랙트에서 실제 owner 가져오기
-            const provider = new ethers.JsonRpcProvider(rpcUrl);
-            const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
-            const owner = await contract.owner();
-            setContractOwner(owner);
-            
-            // 현재 지갑이 owner인지 확인
-            const isOwnerWallet = wagmiAddress.toLowerCase() === owner.toLowerCase();
-            setIsOwner(isOwnerWallet);
-            
-            console.log('📋 컨트랙트 주소:', contractAddress);
-            console.log('👤 컨트랙트 Owner:', owner);
-            console.log('🔑 현재 지갑:', wagmiAddress);
-            console.log('✅ Owner 권한:', isOwnerWallet);
+          // 컨트랙트에서 실제 owner 가져오기
+          const provider = new ethers.JsonRpcProvider(rpcUrl);
+          const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
+          const owner = await contract.owner();
+          setContractOwner(owner);
+          
+          // 현재 지갑이 owner인지 확인
+          const isOwnerWallet = wagmiAddress.toLowerCase() === owner.toLowerCase();
+          setIsOwner(isOwnerWallet);
+          
+          console.log('📋 컨트랙트 주소:', contractAddress);
+          console.log('👤 컨트랙트 Owner:', owner);
+          console.log('🔑 현재 지갑:', wagmiAddress);
+          console.log('✅ Owner 권한:', isOwnerWallet);
 
-            // 컨트랙트 데이터 로드
-            await loadContractData();
-          }
+          // 컨트랙트 데이터 로드
+          await loadContractData();
         } catch (error) {
           console.error('지갑 확인 실패:', error);
         }
@@ -77,7 +76,7 @@ export default function AdminPage() {
     };
 
     checkWallet();
-  }, []);
+  }, [isConnected, wagmiAddress]);
 
   // 컨트랙트 데이터 로드
   const loadContractData = async () => {
@@ -118,16 +117,14 @@ export default function AdminPage() {
     }
 
     try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const userAddress = accounts[0];
-      setAddress(userAddress);
+      setAddress(wagmiAddress);
       
       // 컨트랙트에서 owner 가져오기
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
       const owner = await contract.owner();
       setContractOwner(owner);
-      setIsOwner(userAddress.toLowerCase() === owner.toLowerCase());
+      setIsOwner(wagmiAddress.toLowerCase() === owner.toLowerCase());
 
       await loadContractData();
     } catch (error) {
