@@ -26,9 +26,8 @@ export default function WinnersResultPage() {
   const params = useParams();
   const { kaiaPrice } = useKaiaPrice();
   
-  // Client Component에서는 params가 동기적으로 사용 가능
-  const drawId = params?.drawId ? parseInt(params.drawId as string) : 0;
-
+  // params가 준비될 때까지 안전하게 처리
+  const [drawId, setDrawId] = useState<number>(0);
   const [searchInput, setSearchInput] = useState('');
   const [winningNumbers, setWinningNumbers] = useState<number[]>([]);
   const [totalPrize, setTotalPrize] = useState('0');
@@ -38,15 +37,24 @@ export default function WinnersResultPage() {
   const [availableDrawIds, setAvailableDrawIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // params에서 drawId 추출
+  useEffect(() => {
+    if (params?.drawId) {
+      const parsed = parseInt(params.drawId as string);
+      if (!isNaN(parsed) && parsed > 0) {
+        setDrawId(parsed);
+      } else {
+        console.warn('⚠️ 유효하지 않은 drawId:', params.drawId);
+        setIsLoading(false);
+      }
+    }
+  }, [params]);
+
   useEffect(() => {
     const loadDrawResults = async () => {
-      if (!drawId || isNaN(drawId) || drawId <= 0) {
-        console.warn('⚠️ 유효하지 않은 drawId:', drawId);
-        setIsLoading(false);
+      if (!drawId || drawId <= 0) {
         return;
       }
-
-      setIsLoading(true);
 
       try {
         const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -177,6 +185,26 @@ export default function WinnersResultPage() {
     if (grade === '2등') return 'linear-gradient(135deg, #D2D2D2 0%, #787878 100%)';
     return 'linear-gradient(135deg, #FFB048 0%, #DA4C00 100%)';
   };
+
+  // params가 아직 준비되지 않았으면 로딩 표시
+  if (!params || !params.drawId) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: 'clamp(14px, 3.5vw, 16px)',
+        }}
+      >
+        로딩 중...
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

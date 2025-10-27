@@ -33,17 +33,28 @@ export default function RewardDetailPage() {
   const { walletProvider } = useAppKitProvider('eip155');
   const { kaiaPrice } = useKaiaPrice();
   
-  // Client Component에서는 params가 동기적으로 사용 가능
-  const rewardId = params?.id ? (params.id as string) : '';
-  
+  // params가 준비될 때까지 안전하게 처리
+  const [rewardId, setRewardId] = useState<string>('');
   const [detail, setDetail] = useState<RewardDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // params에서 rewardId 추출
+  useEffect(() => {
+    if (params?.id) {
+      const id = params.id as string;
+      if (id && typeof id === 'string') {
+        setRewardId(id);
+      } else {
+        console.warn('⚠️ 유효하지 않은 ID:', params.id);
+        setIsLoading(false);
+      }
+    }
+  }, [params]);
 
   useEffect(() => {
     const loadDetail = async () => {
       if (!isConnected || !address || !rewardId) {
         console.warn('⚠️ 필수 데이터 누락:', { isConnected, address, rewardId });
-        setIsLoading(false);
         return;
       }
 
@@ -194,6 +205,26 @@ export default function RewardDetailPage() {
 
     loadDetail();
   }, [rewardId, address, isConnected, walletProvider, kaiaPrice]);
+
+  // params가 아직 준비되지 않았으면 로딩 표시
+  if (!params || !params.id) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: 'clamp(14px, 3.5vw, 16px)',
+        }}
+      >
+        로딩 중...
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return (
