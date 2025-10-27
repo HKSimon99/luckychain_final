@@ -339,7 +339,6 @@ export default function RewardDetailPage() {
             style={{
               fontSize: 'clamp(13px, 3.3vw, 14px)',
               fontWeight: '700',
-              marginBottom: 'clamp(18px, 4.5vw, 20px)',
               margin: 0,
               marginBottom: 'clamp(18px, 4.5vw, 20px)',
             }}
