@@ -38,11 +38,13 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
   const [winners, setWinners] = useState<WinnerInfo[]>([]);
   const [availableDrawIds, setAvailableDrawIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // 회차 데이터 로드
   useEffect(() => {
     const loadDrawData = async () => {
-      if (!drawId || drawId <= 0) {
+      if (isNaN(drawId) || !drawId || drawId <= 0) {
+        setError('유효하지 않은 회차 번호입니다');
         setIsLoading(false);
         return;
       }
@@ -151,6 +153,7 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
         setWinners(winnerList);
       } catch (error) {
         console.error('회차 데이터 로드 오류:', error);
+        setError('회차 데이터를 불러오는데 실패했습니다');
       } finally {
         setIsLoading(false);
       }
@@ -177,6 +180,42 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
     if (grade === '2등') return 'linear-gradient(135deg, #D2D2D2 0%, #787878 100%)';
     return 'linear-gradient(135deg, #FFB048 0%, #DA4C00 100%)';
   };
+
+  if (error) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          gap: '20px',
+        }}
+      >
+        <div style={{ fontSize: '24px' }}>⚠️</div>
+        <div style={{ fontSize: '16px' }}>{error}</div>
+        <button
+          onClick={() => router.push('/my/winners')}
+          style={{
+            padding: '12px 24px',
+            background: '#93EE00',
+            color: '#000',
+            border: 'none',
+            borderRadius: '10px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          검색 페이지로 돌아가기
+        </button>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

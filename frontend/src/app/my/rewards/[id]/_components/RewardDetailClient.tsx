@@ -39,11 +39,18 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
   
   const [detail, setDetail] = useState<RewardDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadDetail = async () => {
       if (!isConnected || !address) {
         console.warn('⚠️ 지갑이 연결되지 않음');
+        setIsLoading(false);
+        return;
+      }
+
+      if (isNaN(initialDrawId) || isNaN(initialTokenId) || initialDrawId <= 0 || initialTokenId < 0) {
+        setError('유효하지 않은 보상 ID입니다');
         setIsLoading(false);
         return;
       }
@@ -144,6 +151,7 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         });
       } catch (error) {
         console.error('❌ 상세 정보 로드 실패:', error);
+        setError('보상 정보를 불러오는데 실패했습니다');
       } finally {
         setIsLoading(false);
       }
@@ -151,6 +159,42 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
 
     loadDetail();
   }, [initialDrawId, initialTokenId, address, isConnected, walletProvider, kaiaPrice]);
+
+  if (error) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          gap: '20px',
+        }}
+      >
+        <div style={{ fontSize: '24px' }}>⚠️</div>
+        <div style={{ fontSize: '16px' }}>{error}</div>
+        <button
+          onClick={() => router.push('/my/rewards')}
+          style={{
+            padding: '12px 24px',
+            background: '#93EE00',
+            color: '#000',
+            border: 'none',
+            borderRadius: '10px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          목록으로 돌아가기
+        </button>
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return (
