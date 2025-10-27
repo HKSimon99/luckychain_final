@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ethers } from 'ethers';
 import MobileStatusBar from '@/components/MobileStatusBar';
@@ -10,10 +10,6 @@ import * as lottoAbiModule from '@/lib/lotto-abi-full.json';
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
 const rpcUrl = 'https://public-en-kairos.node.kaia.io';
-
-// Next.js 15 동적 라우트 설정
-export const dynamic = 'force-dynamic';
-export const dynamicParams = true;
 
 interface WinnerInfo {
   grade: string;
@@ -25,13 +21,13 @@ interface WinnerInfo {
   ticketCount: number;
 }
 
-interface PageProps {
-  params: Promise<{ drawId: string }>;
-}
-
-function WinnersResultPageContent({ drawId }: { drawId: number }) {
+export default function WinnersResultPage() {
   const router = useRouter();
+  const params = useParams();
   const { kaiaPrice } = useKaiaPrice();
+  
+  // Client Component에서는 params가 동기적으로 사용 가능
+  const drawId = params?.drawId ? parseInt(params.drawId as string) : 0;
 
   const [searchInput, setSearchInput] = useState('');
   const [winningNumbers, setWinningNumbers] = useState<number[]>([]);
@@ -712,31 +708,5 @@ function WinnersResultPageContent({ drawId }: { drawId: number }) {
       </div>
     </div>
   );
-}
-
-export default async function WinnersResultPage({ params }: PageProps) {
-  const resolvedParams = await params;
-  const drawId = parseInt(resolvedParams.drawId);
-  
-  if (isNaN(drawId) || drawId <= 0) {
-    return (
-      <div
-        style={{
-          width: '100%',
-          height: '100vh',
-          background: '#380D44',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          fontSize: 'clamp(14px, 3.5vw, 16px)',
-        }}
-      >
-        유효하지 않은 회차입니다
-      </div>
-    );
-  }
-
-  return <WinnersResultPageContent drawId={drawId} />;
 }
 

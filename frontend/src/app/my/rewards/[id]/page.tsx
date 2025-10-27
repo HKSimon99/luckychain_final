@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useAppKitProvider } from '@reown/appkit/react';
@@ -12,10 +12,6 @@ import * as lottoAbiModule from '@/lib/lotto-abi-full.json';
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
 const rpcUrl = 'https://public-en-kairos.node.kaia.io';
-
-// Next.js 15 동적 라우트 설정
-export const dynamic = 'force-dynamic';
-export const dynamicParams = true;
 
 interface RewardDetail {
   drawId: number;
@@ -30,15 +26,15 @@ interface RewardDetail {
   transactionHash: string;
 }
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
-
-function RewardDetailPageContent({ rewardId }: { rewardId: string }) {
+export default function RewardDetailPage() {
   const router = useRouter();
+  const params = useParams();
   const { address, isConnected } = useAccount();
   const { walletProvider } = useAppKitProvider('eip155');
   const { kaiaPrice } = useKaiaPrice();
+  
+  // Client Component에서는 params가 동기적으로 사용 가능
+  const rewardId = params?.id ? (params.id as string) : '';
   
   const [detail, setDetail] = useState<RewardDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -599,31 +595,5 @@ function RewardDetailPageContent({ rewardId }: { rewardId: string }) {
       </div>
     </div>
   );
-}
-
-export default async function RewardDetailPage({ params }: PageProps) {
-  const resolvedParams = await params;
-  const rewardId = resolvedParams.id;
-  
-  if (!rewardId || typeof rewardId !== 'string') {
-    return (
-      <div
-        style={{
-          width: '100%',
-          height: '100vh',
-          background: '#380D44',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          fontSize: 'clamp(14px, 3.5vw, 16px)',
-        }}
-      >
-        유효하지 않은 보상 ID입니다
-      </div>
-    );
-  }
-
-  return <RewardDetailPageContent rewardId={rewardId} />;
 }
 
