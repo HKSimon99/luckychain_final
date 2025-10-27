@@ -23,8 +23,26 @@ const KaiaPriceContext = createContext<KaiaPriceContextType | undefined>(undefin
  * - 탭 포커스 시 자동 갱신
  */
 export function KaiaPriceProvider({ children }: { children: ReactNode }) {
-  const [kaiaPrice, setKaiaPrice] = useState<number>(155); // 기본값
-  const [change24h, setChange24h] = useState<number>(0); // 24시간 변동률
+  // localStorage에서 마지막 가격 불러오기
+  const getInitialPrice = () => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lastKaiaPrice');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.price && parsed.price > 0) {
+            return parsed.price;
+          }
+        } catch (e) {
+          console.warn('저장된 가격 파싱 실패');
+        }
+      }
+    }
+    return 155; // 최초 기본값
+  };
+
+  const [kaiaPrice, setKaiaPrice] = useState<number>(getInitialPrice());
+  const [change24h, setChange24h] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -39,14 +57,53 @@ export function KaiaPriceProvider({ children }: { children: ReactNode }) {
         setKaiaPrice(data.price);
         setChange24h(data.change24h);
         setLastUpdated(new Date());
+        
+        // localStorage에 저장
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastKaiaPrice', JSON.stringify({
+            price: data.price,
+            change24h: data.change24h,
+            timestamp: Date.now(),
+          }));
+        }
+        
         // 개발 환경에서만 로그 출력
         if (process.env.NODE_ENV === 'development') {
           console.log('💰 KAIA:', data.price, 'KRW, 변동:', data.change24h.toFixed(2) + '%');
         }
+      } else {
+        // 저장된 값 사용
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('lastKaiaPrice') : null;
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setKaiaPrice(parsed.price || 155);
+          setChange24h(parsed.change24h || 0);
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch price');
-      console.error('❌ KAIA 가격 조회 실패:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch price';
+      setError(errorMessage);
+      
+      // 저장된 마지막 가격 사용
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('lastKaiaPrice');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setKaiaPrice(parsed.price || 155);
+            setChange24h(parsed.change24h || 0);
+            console.warn('⚠️ KAIA 가격 조회 실패 - 저장된 값 사용:', parsed.price, 'KRW');
+          } catch (e) {
+            console.warn('⚠️ KAIA 가격 조회 실패 - 기본값 사용:', errorMessage);
+            setKaiaPrice(155);
+            setChange24h(0);
+          }
+        } else {
+          console.warn('⚠️ KAIA 가격 조회 실패 - 기본값 사용:', errorMessage);
+          setKaiaPrice(155);
+          setChange24h(0);
+        }
+      }
     } finally {
       setIsLoading(false);
     }

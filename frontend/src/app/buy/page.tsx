@@ -47,15 +47,26 @@ export default function BuyTicketPage() {
     fetchPrice();
   }, []);
 
-  // 수량 조절 (제한 없음)
-  const increase = () => setQuantity(prev => prev + 1);
+  // 수량 조절 (최대 100장)
+  const increase = () => {
+    if (quantity >= 100) {
+      alert('최대 100장까지만 구매할 수 있습니다.');
+      return;
+    }
+    setQuantity(prev => prev + 1);
+  };
   const decrease = () => setQuantity(prev => (prev > 1 ? prev - 1 : prev));
   const setQuick = (num: number) => setQuantity(num);
   const reset = () => setQuantity(1);
   const handleQuantityInput = (value: string) => {
     const num = parseInt(value);
-    if (!isNaN(num) && num >= 1) {
-      setQuantity(num);
+    if (!isNaN(num)) {
+      if (num > 100) {
+        alert('최대 100장까지만 구매할 수 있습니다.');
+        setQuantity(100);
+      } else if (num >= 1) {
+        setQuantity(num);
+      }
     }
   };
 
@@ -329,7 +340,7 @@ export default function BuyTicketPage() {
               구매 개수
               <br />
               <span style={{ fontSize: 'clamp(9px, 2.3vw, 10px)', fontWeight: 350 }}>
-                (원하는 만큼 구매 가능)
+                (최대 100장까지 구매 가능)
               </span>
             </div>
 
@@ -369,6 +380,7 @@ export default function BuyTicketPage() {
                 value={quantity}
                 onChange={(e) => handleQuantityInput(e.target.value)}
                 min="1"
+                max="100"
                 style={{ 
                   width: '15vw', 
                   textAlign: 'center', 
@@ -403,31 +415,32 @@ export default function BuyTicketPage() {
             {/* 빠른 선택 버튼 (Radio 스크롤) */}
             <div style={{ 
               display: 'flex', 
-              overflowX: 'auto', 
-              gap: '2vw',
+              gap: 'clamp(4px, 1vw, 6px)',
               width: '100%', 
               marginBottom: '1.5vh',
-              paddingBottom: '0.5vh',
+              justifyContent: 'space-between',
             }}>
-              {[1, 5, 10, 20, 30, 50, 100].map((num) => (
+              {[1, 10, 20, 30, 50, 100].map((num) => (
                 <button
                   key={num}
                   onClick={() => setQuick(num)}
                   style={{
-                    minWidth: '15vw',
-                    padding: '1.2vh 3vw',
-                    borderRadius: '1.5vw',
+                    flex: '1',
+                    minWidth: '0',
+                    padding: '1.2vh 0',
+                    borderRadius: 'clamp(6px, 1.5vw, 8px)',
                     background: quantity === num
                       ? 'linear-gradient(135deg, #C453F5 0%, #FF00B7 100%)'
                       : 'rgba(255, 255, 255, 0.2)',
                     border: quantity === num ? '2px solid #FF00B7' : 'none',
                     color: '#fff',
-                    fontSize: 'clamp(11px, 2.8vw, 12px)',
+                    fontSize: 'clamp(10px, 2.5vw, 11px)',
                     fontWeight: quantity === num ? '700' : '400',
                     cursor: 'pointer',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  {num} 장
+                  {num}장
                 </button>
               ))}
             </div>

@@ -90,23 +90,34 @@ export default function MyPage() {
           setNextDrawDate('-');
         }
 
-        // 5. 내 티켓 조회 (이벤트 기반)
+        // 5. 내 티켓 조회 (이벤트 기반 - 모든 회차 합산)
         const currentBlock = await provider.getBlockNumber();
-        const fromBlock = Math.max(0, currentBlock - 100000);
+        // 최근 2,000,000 블록 조회 (약 23일 분량)
+        // Kaia 블록 시간: 약 1초
+        const fromBlock = Math.max(0, currentBlock - 2000000);
         
-        console.log(`📊 블록 범위: ${fromBlock} ~ ${currentBlock}`);
+        console.log(`📊 블록 범위: ${fromBlock} ~ ${currentBlock} (총 ${currentBlock - fromBlock} 블록)`);
         
         const filter = contract.filters.TicketPurchased(address);
         const events = await contract.queryFilter(filter, fromBlock, 'latest');
         
+        // 모든 회차의 티켓 합산
         const count = events.length;
         const spent = (count * parseFloat(ticketPrice)).toFixed(2);
         
         setTicketCount(count);
         setTotalSpent(spent);
         
-        console.log('🎫 구매한 티켓:', count, '장');
-        console.log('💸 누적 참여 금액:', spent, 'KAIA');
+        console.log('🎫 누적 구매 티켓:', count, '장 (모든 회차)');
+        console.log('💸 누적 참여 금액:', spent, 'KAIA (모든 회차)');
+        
+        // 회차별 집계 (디버깅용)
+        const drawCounts = new Map<number, number>();
+        events.forEach((e: any) => {
+          const drawId = Number(e.args[2] || e.args.drawId);
+          drawCounts.set(drawId, (drawCounts.get(drawId) || 0) + 1);
+        });
+        console.log('📊 회차별 티켓 수:', Object.fromEntries(drawCounts));
         console.log('✅ /my 페이지 데이터 로드 완료');
 
       } catch (error) {
@@ -457,7 +468,7 @@ export default function MyPage() {
 
       {/* 버튼 1: 회차별 당첨자 정보 */}
       <button
-        onClick={() => router.push('/result')}
+        onClick={() => router.push('/my/winners')}
         style={{
           width: 'calc(100% - 36px)',
           height: '53px',
@@ -483,7 +494,7 @@ export default function MyPage() {
       {/* 버튼 2: 보상 수령 내역 */}
       <button
         onClick={() => {
-          alert('보상 수령 내역 페이지는 개발 예정입니다.');
+          router.push('/my/rewards');
         }}
         style={{
           width: 'calc(100% - 36px)',

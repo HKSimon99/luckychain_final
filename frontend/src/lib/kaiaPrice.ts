@@ -15,23 +15,40 @@ export interface KaiaPriceData {
  */
 export async function getKaiaPrice(): Promise<KaiaPriceData> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8초 타임아웃
+    
     const response = await fetch('/api/kaia-price', {
       cache: 'no-store', // 항상 최신 가격
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
+      console.warn(`⚠️ KAIA API 응답 오류: ${response.status}`);
       throw new Error(`API error: ${response.status}`);
     }
 
     const data = await response.json();
     
-    return {
-      price: data.price || 155,
-      change24h: data.change24h || 0,
-      timestamp: data.timestamp || Date.now(),
-    };
+    if (data.price && data.price > 0) {
+      return {
+        price: data.price,
+        change24h: data.change24h || 0,
+        timestamp: data.timestamp || Date.now(),
+      };
+    }
+    
+    throw new Error('Invalid price data');
   } catch (error) {
-    console.error('❌ KAIA 가격 조회 실패:', error);
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        console.warn('⚠️ KAIA 가격 조회 타임아웃 - 폴백 값 사용');
+      } else {
+        console.warn('⚠️ KAIA 가격 조회 실패 - 폴백 값 사용:', error.message);
+      }
+    }
     
     // 폴백 데이터
     return {

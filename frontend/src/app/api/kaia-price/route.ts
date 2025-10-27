@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
-export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface CoinGeckoResponse {
   kaia: {
@@ -47,10 +47,9 @@ export async function GET() {
       {
         headers: {
           'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0',
         },
-        next: {
-          revalidate: 60, // 60초마다 재검증
-        },
+        signal: AbortSignal.timeout(10000), // 10초 타임아웃
       }
     );
 

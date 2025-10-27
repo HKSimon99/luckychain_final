@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useAppKitProvider } from '@reown/appkit/react';
 import { ethers } from 'ethers';
-import Image from 'next/image';
 import MobileStatusBar from '@/components/MobileStatusBar';
 import { useKaiaPrice } from '@/contexts/KaiaPriceContext';
 import * as lottoAbiModule from '@/lib/lotto-abi-full.json';
@@ -46,6 +45,7 @@ export default function LotteryListPage() {
   const [selectedDrawId, setSelectedDrawId] = useState<number | 'all'>('all');
   const [availableDrawIds, setAvailableDrawIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // 티켓 로드
   useEffect(() => {
@@ -55,13 +55,16 @@ export default function LotteryListPage() {
         return;
       }
 
-      try {
-        // ✅ Reown AppKit 패턴: walletProvider 사용 (모바일 지원)
-        if (!walletProvider) {
-          throw new Error('지갑 프로바이더를 찾을 수 없습니다. 지갑을 다시 연결해주세요.');
-        }
+      // walletProvider가 준비될 때까지 기다림
+      if (!walletProvider) {
+        console.log('⏳ 지갑 프로바이더 대기 중...');
+        return;
+      }
 
-        const provider = new ethers.BrowserProvider(walletProvider as any);
+      try {
+        // 읽기 작업은 안정적인 JsonRpcProvider 사용
+        const rpcUrl = 'https://public-en-kairos.node.kaia.io';
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
         const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
 
         // 티켓 가격
@@ -73,8 +76,10 @@ export default function LotteryListPage() {
 
         // 내가 구매한 티켓 이벤트 조회 (모든 회차)
         const currentBlock = await provider.getBlockNumber();
-        // 블록 범위 확대 (최대한 많은 블록 조회)
-        const fromBlock = Math.max(0, currentBlock - 500000);  // 약 2주 분량
+        // 최근 2,000,000 블록 조회 (약 23일 분량, Kaia는 1초당 1블록)
+        const fromBlock = Math.max(0, currentBlock - 2000000);
+        
+        console.log(`📊 블록 범위: ${fromBlock} ~ ${currentBlock} (총 ${currentBlock - fromBlock} 블록)`);
         
         const filter = contract.filters.TicketPurchased(address);
         const events = await contract.queryFilter(filter, fromBlock, 'latest');
@@ -277,7 +282,23 @@ export default function LotteryListPage() {
     };
 
     loadTickets();
-  }, [address, isConnected]);
+  }, [address, isConnected, walletProvider, refreshTrigger]);
+
+  // 페이지 포커스 시 데이터 리프레시
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isConnected && address) {
+        console.log('📱 페이지 포커스 - 데이터 리프레시');
+        setRefreshTrigger(prev => prev + 1);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isConnected, address]);
 
   // 탭 및 회차 필터링
   useEffect(() => {
@@ -353,19 +374,30 @@ export default function LotteryListPage() {
   }
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100vh',
-        background: '#380D44',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
+    <>
+      <style jsx>{`
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
       {/* 상단 고정 영역 */}
       <div
         style={{
@@ -411,6 +443,27 @@ export default function LotteryListPage() {
           >
             복권 리스트
           </span>
+
+          {/* 새로고침 버튼 */}
+          <div
+            onClick={() => {
+              if (!isLoading) {
+                console.log('🔄 수동 새로고침');
+                setRefreshTrigger(prev => prev + 1);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              right: 'clamp(18px, 4.5vw, 20px)',
+              cursor: isLoading ? 'default' : 'pointer',
+              fontSize: 'clamp(16px, 4vw, 18px)',
+              color: 'white',
+              opacity: isLoading ? 0.5 : 1,
+              animation: isLoading ? 'spin 1s linear infinite' : 'none',
+            }}
+          >
+            🔄
+          </div>
         </div>
 
         {/* 회차 필터 */}
@@ -747,6 +800,7 @@ export default function LotteryListPage() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

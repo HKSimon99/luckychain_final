@@ -19,6 +19,7 @@ interface WinningTicket {
   numbers: number[];
   rank: string;
   matchCount: number;
+  prizeAmount: number;  // 실제 당첨금 (KAIA)
 }
 
 export default function ResultPage() {
@@ -67,17 +68,48 @@ export default function ResultPage() {
           const browserContract = new ethers.Contract(contractAddress, lottoAbi, browserProvider);
           
           const currentBlock = await browserProvider.getBlockNumber();
-          const fromBlock = Math.max(0, currentBlock - 100000);
+          // 최근 2,000,000 블록 조회 (약 23일 분량)
+          const fromBlock = Math.max(0, currentBlock - 2000000);
+          
+          console.log(`📊 /result 블록 범위: ${fromBlock} ~ ${currentBlock}`);
           
           const filter = browserContract.filters.TicketPurchased(address);
           const events = await browserContract.queryFilter(filter, fromBlock, 'latest');
+          
+          console.log(`📊 발견된 총 티켓: ${events.length}개`);
 
           // 선택된 회차의 티켓만
           const myDrawTickets = events.filter((e: any) => Number(e.args[2] || e.args.drawId) === drawId);
           setMyTicketCount(myDrawTickets.length);
+          
+          console.log(`📊 ${drawId}회차 내 티켓: ${myDrawTickets.length}개`);
+
+          // 상금 정보 조회 (PrizesDistributed 이벤트)
+          let firstPrize = 0, secondPrize = 0, thirdPrize = 0;
+          try {
+            const prizeFilter = browserContract.filters.PrizesDistributed(drawId);
+            const prizeEvents = await browserContract.queryFilter(prizeFilter, fromBlock, 'latest');
+            
+            console.log(`💰 PrizesDistributed 이벤트: ${prizeEvents.length}개 발견`);
+            
+            if (prizeEvents.length > 0) {
+              const prizeEvent = prizeEvents[0] as any;
+              firstPrize = Number(ethers.formatEther(prizeEvent.args.firstPrize || 0));
+              secondPrize = Number(ethers.formatEther(prizeEvent.args.secondPrize || 0));
+              thirdPrize = Number(ethers.formatEther(prizeEvent.args.thirdPrize || 0));
+              
+              console.log(`💰 상금 정보: 1등=${firstPrize}, 2등=${secondPrize}, 3등=${thirdPrize} KAIA`);
+            } else {
+              console.warn('⚠️ 상금 정보 이벤트를 찾을 수 없습니다');
+            }
+          } catch (e) {
+            console.error('상금 정보 조회 실패:', e);
+          }
 
           // 당첨 티켓 찾기
           const winners: WinningTicket[] = [];
+          
+          console.log(`🎯 당첨 번호 (${drawId}회차):`, numbers);
           
           if (numbers.some(n => n > 0)) {
             for (const event of myDrawTickets) {
@@ -85,31 +117,59 @@ export default function ResultPage() {
               const tokenId = Number(eventData.args[1] || eventData.args.tokenId);
               const ticketNumbers = Array.from(eventData.args[3] || eventData.args.numbers || []).map((n: any) => Number(n));
               
+              console.log(`  티켓 #${tokenId} 번호:`, ticketNumbers);
+              
               const matchCount = ticketNumbers.filter((n: number) => numbers.includes(n)).length;
               
-              if (matchCount >= 2) {
+              console.log(`  → 일치 개수: ${matchCount}개`);
+              
+              // 3등(4개 일치)부터 당첨
+              if (matchCount >= 4) {
                 let rank = '';
-                if (matchCount === 6) rank = '1등';
-                else if (matchCount === 5) rank = '2등';
-                else if (matchCount === 4) rank = '3등';
-                else if (matchCount === 3) rank = '4등';
-                else if (matchCount === 2) rank = '5등';
+                let prizeAmount = 0;
+                
+                if (matchCount === 6) {
+                  rank = '1등';
+                  prizeAmount = firstPrize;
+                } else if (matchCount === 5) {
+                  rank = '2등';
+                  prizeAmount = secondPrize;
+                } else if (matchCount === 4) {
+                  rank = '3등';
+                  prizeAmount = thirdPrize;
+                }
+                
+                console.log(`  ✅ ${rank} 당첨! 상금: ${prizeAmount} KAIA`);
                 
                 winners.push({
                   tokenId,
                   numbers: ticketNumbers,
                   rank,
                   matchCount,
+                  prizeAmount,
                 });
+              } else {
+                console.log(`  ❌ 낙첨 (${matchCount}개 일치)`);
               }
             }
           }
           
+          console.log(`📊 총 당첨 티켓: ${winners.length}개`);
+          
           setWinningTickets(winners);
           setIsWinner(winners.length > 0);
           
-          // 상금 계산 (티켓 수 × 티켓 가격)
-          const prize = (myDrawTickets.length * ticketPrice).toFixed(1);
+          // 금액 계산
+          let prize: string;
+          if (winners.length > 0) {
+            // 당첨된 경우: 실제 당첨금 합계
+            const totalWinnings = winners.reduce((sum, ticket) => sum + ticket.prizeAmount, 0);
+            prize = totalWinnings.toFixed(2);
+          } else {
+            // 낙첨된 경우: 구매 금액
+            prize = (myDrawTickets.length * ticketPrice).toFixed(2);
+          }
+          
           setTotalPrize(prize);
           setPrizeKRW((parseFloat(prize) * kaiaPrice).toLocaleString('ko-KR', { maximumFractionDigits: 0 }));
         }
@@ -439,8 +499,8 @@ export default function ResultPage() {
               )}
             </div>
 
-            {/* 당첨 티켓 인디케이터 (2개 이상일 때만) */}
-            {winningTickets.length > 1 && (
+            {/* 당첨 티켓 인디케이터 */}
+            {winningTickets.length > 0 && (
               <div
                 style={{
                   textAlign: 'center',
@@ -450,8 +510,10 @@ export default function ResultPage() {
                   fontWeight: '600',
                 }}
               >
-                {currentWinningTicketIndex + 1} / {winningTickets.length} 
-                {' '}({winningTickets[currentWinningTicketIndex].rank})
+                {winningTickets.length > 1 && (
+                  <>{currentWinningTicketIndex + 1} / {winningTickets.length}{' '}</>
+                )}
+                ({winningTickets[currentWinningTicketIndex].rank})
               </div>
             )}
           </div>
@@ -486,7 +548,7 @@ export default function ResultPage() {
               fontWeight: '600',
             }}
           >
-            <span>금액</span>
+            <span>{isWinner ? '당첨금' : '구매 금액'}</span>
             <div style={{ textAlign: 'right' }}>
               <div>{totalPrize} KAIA</div>
               <div
@@ -505,7 +567,7 @@ export default function ResultPage() {
         {/* 당첨자 정보 버튼 */}
         <button
           onClick={() => {
-            alert('당첨자 정보 상세 페이지는 개발 예정입니다.');
+            router.push(`/result/winners?drawId=${selectedDrawId}`);
           }}
           style={{
             width: '95vw',
