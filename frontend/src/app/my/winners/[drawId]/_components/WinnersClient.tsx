@@ -101,6 +101,9 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
         const winnerMap = new Map<string, { tokenIds: number[]; rank: string; prize: number }>();
 
         for (const event of prizeEvents) {
+          // EventLog 타입 체크
+          if (!('args' in event)) continue;
+          
           const tokenId = Number(event.args[1]);
           const winner = event.args[2];
           const rank = event.args[3];
