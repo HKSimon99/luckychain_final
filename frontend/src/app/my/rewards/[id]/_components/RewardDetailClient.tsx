@@ -43,6 +43,13 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
 
   useEffect(() => {
     const loadDetail = async () => {
+      console.log('🔍 [DEBUG] RewardDetailClient 시작');
+      console.log('  - initialDrawId:', initialDrawId);
+      console.log('  - initialTokenId:', initialTokenId);
+      console.log('  - isConnected:', isConnected);
+      console.log('  - address:', address);
+      console.log('  - walletProvider:', walletProvider ? '있음' : '없음');
+
       if (!isConnected || !address) {
         console.warn('⚠️ 지갑이 연결되지 않음');
         setIsLoading(false);
@@ -50,6 +57,7 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
       }
 
       if (isNaN(initialDrawId) || isNaN(initialTokenId) || initialDrawId <= 0 || initialTokenId < 0) {
+        console.error('❌ 유효하지 않은 ID:', { initialDrawId, initialTokenId });
         setError('유효하지 않은 보상 ID입니다');
         setIsLoading(false);
         return;
@@ -66,67 +74,90 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         const drawId = initialDrawId;
         const tokenId = initialTokenId;
 
-        console.log(`📊 상세 정보 로드: 회차=${drawId}, 티켓=${tokenId}`);
+        console.log(`📊 상세 정보 로드 시작: 회차=${drawId}, 티켓=${tokenId}`);
+        console.log('1️⃣ RPC Provider 생성 중...');
 
         const provider = new ethers.JsonRpcProvider(rpcUrl);
         const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
+        console.log('✅ RPC Provider 생성 완료');
 
         // 당첨 번호 조회
+        console.log('2️⃣ 당첨 번호 조회 중...');
         const winningNums: number[] = [];
         for (let i = 0; i < 6; i++) {
           const num = await contract.winningNumbers(drawId, i);
           winningNums.push(Number(num));
         }
         winningNums.sort((a, b) => a - b);
+        console.log('✅ 당첨 번호:', winningNums);
 
         // 내 번호 조회
+        console.log('3️⃣ 내 번호 조회 중... (tokenId:', tokenId, ')');
         const myNums = await contract.ticketNumbers(tokenId);
         const myNumArray = myNums.map((n: any) => Number(n));
+        console.log('✅ 내 번호:', myNumArray);
 
         // 매칭 수 계산
+        console.log('4️⃣ 매칭 수 계산 중...');
         const matchCount = myNumArray.filter((n: number) => winningNums.includes(n)).length;
+        console.log('✅ 매칭 수:', matchCount, '개');
 
         let grade = '';
         let prizeAmount = 0;
 
+        console.log('5️⃣ 등수 및 상금 조회 중...');
         if (matchCount === 6) {
           grade = '1등';
           const firstPrizeWei = await contract.firstPrize(drawId);
           prizeAmount = parseFloat(ethers.formatEther(firstPrizeWei));
+          console.log('✅ 1등! 상금:', prizeAmount, 'KAIA');
         } else if (matchCount === 5) {
           grade = '2등';
           const secondPrizeWei = await contract.secondPrize(drawId);
           prizeAmount = parseFloat(ethers.formatEther(secondPrizeWei));
+          console.log('✅ 2등! 상금:', prizeAmount, 'KAIA');
         } else if (matchCount === 4) {
           grade = '3등';
           const thirdPrizeWei = await contract.thirdPrize(drawId);
           prizeAmount = parseFloat(ethers.formatEther(thirdPrizeWei));
+          console.log('✅ 3등! 상금:', prizeAmount, 'KAIA');
         } else {
           grade = '낙첨';
           prizeAmount = 0;
+          console.log('❌ 낙첨 (매칭 수:', matchCount, ')');
         }
 
         // PrizesDistributed 이벤트에서 트랜잭션 해시 조회
+        console.log('6️⃣ PrizesDistributed 이벤트 조회 중...');
         const prizeFilter = contract.filters.PrizesDistributed(drawId, tokenId);
         const currentBlock = await provider.getBlockNumber();
         const fromBlock = Math.max(0, currentBlock - 2000000);
+        console.log('  - 블록 범위:', fromBlock, '~', currentBlock);
+        
         const prizeEvents = await contract.queryFilter(prizeFilter, fromBlock, 'latest');
+        console.log('✅ PrizesDistributed 이벤트:', prizeEvents.length, '개');
 
         let transactionHash = '';
         let receiptDate = '';
 
         if (prizeEvents.length > 0) {
           transactionHash = prizeEvents[0].transactionHash;
+          console.log('  - TX Hash:', transactionHash);
           const block = await provider.getBlock(prizeEvents[0].blockNumber);
           if (block) {
             const date = new Date(Number(block.timestamp) * 1000);
             receiptDate = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+            console.log('  - 수령 일시:', receiptDate);
           }
+        } else {
+          console.warn('⚠️ PrizesDistributed 이벤트 없음 (아직 지급되지 않았을 수 있음)');
         }
 
         // 추첨 날짜 조회 (DrawCompleted 이벤트)
+        console.log('7️⃣ DrawCompleted 이벤트 조회 중...');
         const drawFilter = contract.filters.DrawCompleted(drawId);
         const drawEvents = await contract.queryFilter(drawFilter, fromBlock, 'latest');
+        console.log('✅ DrawCompleted 이벤트:', drawEvents.length, '개');
 
         let drawDate = '';
         if (drawEvents.length > 0) {
@@ -134,10 +165,14 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
           if (block) {
             const date = new Date(Number(block.timestamp) * 1000);
             drawDate = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+            console.log('  - 추첨 일시:', drawDate);
           }
+        } else {
+          console.warn('⚠️ DrawCompleted 이벤트 없음');
         }
 
-        setDetail({
+        console.log('8️⃣ 최종 데이터 설정 중...');
+        const finalDetail = {
           drawId,
           tokenId,
           grade,
@@ -148,11 +183,22 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
           winningNumbers: winningNums,
           myNumbers: myNumArray,
           transactionHash,
-        });
+        };
+        
+        console.log('✅ 최종 데이터:', finalDetail);
+        setDetail(finalDetail);
+        console.log('🎉 모든 데이터 로드 완료!');
       } catch (error) {
-        console.error('❌ 상세 정보 로드 실패:', error);
+        console.error('❌❌❌ 상세 정보 로드 실패 ❌❌❌');
+        console.error('오류 타입:', error instanceof Error ? error.name : typeof error);
+        console.error('오류 메시지:', error instanceof Error ? error.message : String(error));
+        console.error('전체 오류 객체:', error);
+        if (error instanceof Error && error.stack) {
+          console.error('스택 트레이스:', error.stack);
+        }
         setError('보상 정보를 불러오는데 실패했습니다');
       } finally {
+        console.log('🏁 로딩 종료');
         setIsLoading(false);
       }
     };
