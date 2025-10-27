@@ -7,6 +7,7 @@ import { useAppKitProvider } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 import Image from 'next/image';
 import MobileStatusBar from '@/components/MobileStatusBar';
+import { useKaiaPrice } from '@/contexts/KaiaPriceContext';
 import * as lottoAbiModule from '@/lib/lotto-abi-full.json';
 
 const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
@@ -22,6 +23,10 @@ interface Ticket {
   drawId: number;
   tokenId: number;
   purchasePrice: string;
+  winningNumbers: number[];  // 당첨 번호 추가
+  prizeAmount: number;  // 실제 당첨금 (KAIA)
+  purchaseDate: string;  // 구매 날짜 (YYYY.MM.DD)
+  purchaseTime: string;  // 구매 시간 (HH:MM)
 }
 
 const statusColors = {
@@ -34,9 +39,12 @@ export default function LotteryListPage() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
   const { walletProvider } = useAppKitProvider('eip155');
+  const { kaiaPrice } = useKaiaPrice();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
   const [selectedTab, setSelectedTab] = useState<'전체' | '당첨' | '낙첨'>('전체');
+  const [selectedDrawId, setSelectedDrawId] = useState<number | 'all'>('all');
+  const [availableDrawIds, setAvailableDrawIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 티켓 로드
@@ -76,6 +84,13 @@ export default function LotteryListPage() {
         }
 
         const loadedTickets: Ticket[] = [];
+        
+        // 회차별 상금 정보를 캐싱 (중복 조회 방지)
+        const drawPrizes = new Map<number, {
+          firstPrize: number;
+          secondPrize: number;
+          thirdPrize: number;
+        }>();
 
         for (const event of events) {
           try {
@@ -86,6 +101,20 @@ export default function LotteryListPage() {
             const numbers = Array.from(eventData.args[3] || eventData.args.numbers || []).map((n: any) => Number(n));
 
             console.log(`🎫 티켓 #${tokenId} - ${drawId}회차 처리 중...`);
+
+            // 구매 시간 조회 (이벤트 블록의 타임스탬프 사용)
+            let formattedDate = '-';
+            let formattedTime = '-';
+            try {
+              const block = await provider.getBlock(event.blockNumber);
+              if (block && block.timestamp) {
+                const purchaseDate = new Date(Number(block.timestamp) * 1000);
+                formattedDate = `${purchaseDate.getFullYear()}.${String(purchaseDate.getMonth() + 1).padStart(2, '0')}.${String(purchaseDate.getDate()).padStart(2, '0')}`;
+                formattedTime = `${String(purchaseDate.getHours()).padStart(2, '0')}:${String(purchaseDate.getMinutes()).padStart(2, '0')}`;
+              }
+            } catch (e) {
+              console.log(`  ⚠️ 구매 시간 조회 실패`);
+            }
 
             // 소유권 확인
             try {
@@ -108,6 +137,7 @@ export default function LotteryListPage() {
             let status: '당첨' | '낙첨' | '대기중' = '대기중';
             let prize = '-';
             let rank = '';
+            let prizeAmount = 0;
 
             // 당첨 번호 조회
             const winningNums: number[] = [];
@@ -143,27 +173,55 @@ export default function LotteryListPage() {
 
               console.log(`  일치 개수: ${matchCount}개`);
 
-              if (matchCount >= 2) {
+              if (matchCount >= 4) {
                 status = '당첨';
                 
-                // 등수 계산
+                // 등수 계산 (3등까지만)
                 if (matchCount === 6) {
                   rank = '1등';
-                  prize = '잭팟!';
                 } else if (matchCount === 5) {
                   rank = '2등';
-                  prize = '고액 당첨!';
                 } else if (matchCount === 4) {
                   rank = '3등';
-                  prize = '중위 당첨!';
-                } else if (matchCount === 3) {
-                  rank = '4등';
-                  prize = '소액 당첨!';
-                } else if (matchCount === 2) {
-                  rank = '5등';
-                  prize = '참가상!';
                 }
-                console.log(`  ✅ ${rank} 당첨!`);
+                
+                // 상금 정보 조회
+                if (!drawPrizes.has(drawId)) {
+                  // PrizesDistributed 이벤트 조회
+                  try {
+                    const prizeFilter = contract.filters.PrizesDistributed(drawId);
+                    const prizeEvents = await contract.queryFilter(prizeFilter, fromBlock, 'latest');
+                    
+                    if (prizeEvents.length > 0) {
+                      const prizeEvent = prizeEvents[0] as any;
+                      const firstPrize = Number(ethers.formatEther(prizeEvent.args.firstPrize || 0));
+                      const secondPrize = Number(ethers.formatEther(prizeEvent.args.secondPrize || 0));
+                      const thirdPrize = Number(ethers.formatEther(prizeEvent.args.thirdPrize || 0));
+                      
+                      drawPrizes.set(drawId, { firstPrize, secondPrize, thirdPrize });
+                      console.log(`  💰 ${drawId}회차 상금: 1등=${firstPrize}, 2등=${secondPrize}, 3등=${thirdPrize} KAIA`);
+                    } else {
+                      drawPrizes.set(drawId, { firstPrize: 0, secondPrize: 0, thirdPrize: 0 });
+                    }
+                  } catch (e) {
+                    console.error(`  ⚠️ 상금 정보 조회 실패:`, e);
+                    drawPrizes.set(drawId, { firstPrize: 0, secondPrize: 0, thirdPrize: 0 });
+                  }
+                }
+                
+                // 등수에 따라 상금 설정
+                const prizes = drawPrizes.get(drawId);
+                if (prizes) {
+                  if (rank === '1등') {
+                    prizeAmount = prizes.firstPrize;
+                  } else if (rank === '2등') {
+                    prizeAmount = prizes.secondPrize;
+                  } else if (rank === '3등') {
+                    prizeAmount = prizes.thirdPrize;
+                  }
+                }
+                
+                console.log(`  ✅ ${rank} 당첨! 상금: ${prizeAmount} KAIA`);
               } else {
                 status = '낙첨';
                 prize = '0원';
@@ -181,6 +239,10 @@ export default function LotteryListPage() {
               drawId,
               tokenId,
               purchasePrice: `${ticketPrice} KAIA`,
+              winningNumbers: winningNums,  // 당첨 번호 저장
+              prizeAmount,  // 실제 당첨금 저장
+              purchaseDate: formattedDate,  // 구매 날짜
+              purchaseTime: formattedTime,  // 구매 시간
             });
 
           } catch (error) {
@@ -200,6 +262,10 @@ export default function LotteryListPage() {
           console.log(`✅ 총 ${loadedTickets.length}개 티켓 (당첨:${loadedTickets.filter(t => t.status === '당첨').length}, 낙첨:${loadedTickets.filter(t => t.status === '낙첨').length}, 대기:${loadedTickets.filter(t => t.status === '대기중').length})`);
         }
         
+        // 회차 목록 추출 (중복 제거 및 정렬)
+        const drawIds = Array.from(new Set(loadedTickets.map(t => t.drawId))).sort((a, b) => b - a);
+        setAvailableDrawIds(drawIds);
+        
         setTickets(loadedTickets);
         setFilteredTickets(loadedTickets);
 
@@ -213,16 +279,24 @@ export default function LotteryListPage() {
     loadTickets();
   }, [address, isConnected]);
 
-  // 탭 필터링
+  // 탭 및 회차 필터링
   useEffect(() => {
-    if (selectedTab === '전체') {
-      setFilteredTickets(tickets);
-    } else if (selectedTab === '당첨') {
-      setFilteredTickets(tickets.filter(t => t.status === '당첨'));
-    } else if (selectedTab === '낙첨') {
-      setFilteredTickets(tickets.filter(t => t.status === '낙첨'));
+    let filtered = tickets;
+    
+    // 회차 필터링
+    if (selectedDrawId !== 'all') {
+      filtered = filtered.filter(t => t.drawId === selectedDrawId);
     }
-  }, [selectedTab, tickets]);
+    
+    // 상태 필터링
+    if (selectedTab === '당첨') {
+      filtered = filtered.filter(t => t.status === '당첨');
+    } else if (selectedTab === '낙첨') {
+      filtered = filtered.filter(t => t.status === '낙첨');
+    }
+    
+    setFilteredTickets(filtered);
+  }, [selectedTab, selectedDrawId, tickets]);
 
   if (!isConnected) {
     return (
@@ -339,13 +413,59 @@ export default function LotteryListPage() {
           </span>
         </div>
 
+        {/* 회차 필터 */}
+        <div
+          style={{
+            padding: '0 clamp(18px, 4.5vw, 20px)',
+            marginTop: 'clamp(20px, 5vw, 25px)',
+          }}
+        >
+          <div
+            style={{
+              color: '#B5B2A1',
+              fontSize: 'clamp(11px, 2.8vw, 12px)',
+              marginBottom: 'clamp(8px, 2vw, 10px)',
+              fontFamily: 'SF Pro, Arial, sans-serif',
+            }}
+          >
+            회차 선택
+          </div>
+          <select
+            value={selectedDrawId}
+            onChange={(e) => setSelectedDrawId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            style={{
+              width: '100%',
+              height: 'clamp(40px, 10vw, 44px)',
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 'clamp(8px, 2vw, 10px)',
+              color: 'white',
+              fontSize: 'clamp(13px, 3.3vw, 14px)',
+              fontWeight: '600',
+              padding: '0 clamp(12px, 3vw, 15px)',
+              fontFamily: 'SF Pro, Arial, sans-serif',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <option value="all" style={{ background: '#380D44', color: 'white' }}>
+              전체 회차
+            </option>
+            {availableDrawIds.map((drawId) => (
+              <option key={drawId} value={drawId} style={{ background: '#380D44', color: 'white' }}>
+                {drawId}회차
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* 탭 버튼 */}
         <div
           style={{
             display: 'flex',
             gap: 'clamp(8px, 2vw, 10px)',
             padding: '0 clamp(18px, 4.5vw, 20px)',
-            marginTop: 'clamp(50px, 12.5vw, 70px)',
+            marginTop: 'clamp(15px, 3.8vw, 18px)',
             marginBottom: 'clamp(20px, 5vw, 25px)',
           }}
         >
@@ -436,16 +556,35 @@ export default function LotteryListPage() {
                 </div>
               </div>
 
-              {/* 티켓 번호 */}
+              {/* 티켓 번호 + 날짜/시간 */}
               <div
                 style={{
-                  color: 'white',
-                  fontSize: 'clamp(9px, 2.3vw, 10px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'clamp(10px, 2.5vw, 12px)',
                   marginTop: '5px',
-                  fontFamily: 'SF Pro, Arial, sans-serif',
                 }}
               >
-                {ticket.ticketId}
+                <div
+                  style={{
+                    color: 'white',
+                    fontSize: 'clamp(9px, 2.3vw, 10px)',
+                    fontFamily: 'SF Pro, Arial, sans-serif',
+                  }}
+                >
+                  {ticket.ticketId}
+                </div>
+                <div
+                  style={{
+                    color: '#D1D1D1',
+                    fontSize: 'clamp(8px, 2vw, 9px)',
+                    fontWeight: '400',
+                    fontFamily: 'SF Pro, Arial, sans-serif',
+                    opacity: 0.8,
+                  }}
+                >
+                  {ticket.purchaseDate} {ticket.purchaseTime}
+                </div>
               </div>
 
               {/* 티켓번호 아래 흰색 선 */}
@@ -507,28 +646,33 @@ export default function LotteryListPage() {
                   gap: 'clamp(4px, 1vw, 6px)',
                 }}
               >
-                {ticket.numbers.map((num, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      width: 'clamp(40px, 10vw, 42px)',
-                      height: 'clamp(40px, 10vw, 42px)',
-                      borderRadius: 'clamp(8px, 2vw, 10px)',
-                      background: idx < 3 ? '#D9FF32' : '#FDFDFD',
-                      boxShadow: idx < 3 ? '0 0 5px #FFFFFF' : 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: 0.7,
-                      fontWeight: '700',
-                      fontSize: 'clamp(13px, 3.3vw, 14px)',
-                      color: '#000',
-                      fontFamily: 'SF Pro, Arial, sans-serif',
-                    }}
-                  >
-                    {num}
-                  </div>
-                ))}
+                {ticket.numbers.map((num, idx) => {
+                  // 당첨 번호와 일치하는지 확인
+                  const isWinningNumber = ticket.winningNumbers && ticket.winningNumbers.includes(num);
+                  
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        width: 'clamp(40px, 10vw, 42px)',
+                        height: 'clamp(40px, 10vw, 42px)',
+                        borderRadius: 'clamp(8px, 2vw, 10px)',
+                        background: isWinningNumber ? '#D9FF32' : '#FDFDFD',
+                        boxShadow: isWinningNumber ? '0 0 5px #FFFFFF' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: 0.7,
+                        fontWeight: '700',
+                        fontSize: 'clamp(13px, 3.3vw, 14px)',
+                        color: '#000',
+                        fontFamily: 'SF Pro, Arial, sans-serif',
+                      }}
+                    >
+                      {num}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* 하단: 구매 금액 + 상금 */}
@@ -536,29 +680,66 @@ export default function LotteryListPage() {
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: '8px',
+                  alignItems: 'flex-end',
+                  marginTop: 'clamp(8px, 2vw, 10px)',
+                  gap: 'clamp(6px, 1.5vw, 8px)',
                 }}
               >
-                <div
-                  style={{
-                    color: '#56AC73',
-                    fontSize: 'clamp(10px, 2.5vw, 11px)',
-                    fontWeight: '500',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                  }}
-                >
-                  {ticket.purchasePrice}
+                {/* 좌측: 사용금액 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: '0 0 auto' }}>
+                  <div
+                    style={{
+                      color: '#B5B2A1',
+                      fontSize: 'clamp(7px, 1.8vw, 8px)',
+                      fontWeight: '400',
+                      fontFamily: 'SF Pro, Arial, sans-serif',
+                    }}
+                  >
+                    사용금액
+                  </div>
+                  <div
+                    style={{
+                      color: '#56AC73',
+                      fontSize: 'clamp(9px, 2.2vw, 10px)',
+                      fontWeight: '500',
+                      fontFamily: 'SF Pro, Arial, sans-serif',
+                    }}
+                  >
+                    {ticket.purchasePrice}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    color: '#D1D1D1',
-                    fontSize: 'clamp(10px, 2.5vw, 11px)',
-                    fontWeight: '500',
-                    fontFamily: 'SF Pro, Arial, sans-serif',
-                  }}
-                >
-                  {ticket.prize}
+                
+                {/* 우측: 당첨금 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end', flex: '1 1 auto', minWidth: 0 }}>
+                  <div
+                    style={{
+                      color: '#B5B2A1',
+                      fontSize: 'clamp(7px, 1.8vw, 8px)',
+                      fontWeight: '400',
+                      fontFamily: 'SF Pro, Arial, sans-serif',
+                    }}
+                  >
+                    당첨금
+                  </div>
+                  <div
+                    style={{
+                      color: ticket.status === '당첨' ? '#FFD700' : '#D1D1D1',
+                      fontSize: 'clamp(8px, 2vw, 9px)',
+                      fontWeight: ticket.status === '당첨' ? '600' : '500',
+                      fontFamily: 'SF Pro, Arial, sans-serif',
+                      textAlign: 'right',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    {ticket.status === '당첨' && ticket.prizeAmount > 0 ? (
+                      `${ticket.prizeAmount.toFixed(2)} KAIA (${Math.floor(ticket.prizeAmount * kaiaPrice).toLocaleString('ko-KR')}원)`
+                    ) : (
+                      ticket.prize
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
