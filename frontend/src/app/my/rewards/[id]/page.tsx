@@ -39,6 +39,7 @@ export default function RewardDetailPage() {
   useEffect(() => {
     const loadDetail = async () => {
       if (!isConnected || !address || !params.id) {
+        console.warn('⚠️ 필수 데이터 누락:', { isConnected, address, id: params.id });
         setIsLoading(false);
         return;
       }
@@ -48,11 +49,28 @@ export default function RewardDetailPage() {
         return;
       }
 
+      setIsLoading(true);
+
       try {
         // ID 파싱 (형식: "drawId-tokenId")
-        const [drawIdStr, tokenIdStr] = (params.id as string).split('-');
-        const drawId = parseInt(drawIdStr);
-        const tokenId = parseInt(tokenIdStr);
+        const idString = params.id as string;
+        if (!idString || typeof idString !== 'string') {
+          throw new Error('Invalid ID format');
+        }
+
+        const parts = idString.split('-');
+        if (parts.length !== 2) {
+          throw new Error('ID must be in format: drawId-tokenId');
+        }
+
+        const drawId = parseInt(parts[0]);
+        const tokenId = parseInt(parts[1]);
+
+        if (isNaN(drawId) || isNaN(tokenId) || drawId <= 0 || tokenId < 0) {
+          throw new Error('Invalid drawId or tokenId');
+        }
+
+        console.log(`📊 상세 정보 로드: 회차=${drawId}, 티켓=${tokenId}`);
 
         const provider = new ethers.JsonRpcProvider(rpcUrl);
         const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
@@ -82,14 +100,16 @@ export default function RewardDetailPage() {
         const prizeFilter = contract.filters.PrizesDistributed(drawId);
         const prizeEvents = await contract.queryFilter(prizeFilter, fromBlock, 'latest');
 
+        console.log(`💰 PrizesDistributed 이벤트: ${prizeEvents ? prizeEvents.length : 0}개`);
+
         let grade = '';
         let prizeAmount = 0;
 
-        if (prizeEvents.length > 0) {
+        if (prizeEvents && prizeEvents.length > 0) {
           const prizeEvent = prizeEvents[0] as any;
-          const firstPrize = Number(ethers.formatEther(prizeEvent.args.firstPrize || 0));
-          const secondPrize = Number(ethers.formatEther(prizeEvent.args.secondPrize || 0));
-          const thirdPrize = Number(ethers.formatEther(prizeEvent.args.thirdPrize || 0));
+          const firstPrize = Number(ethers.formatEther(prizeEvent.args?.firstPrize || 0));
+          const secondPrize = Number(ethers.formatEther(prizeEvent.args?.secondPrize || 0));
+          const thirdPrize = Number(ethers.formatEther(prizeEvent.args?.thirdPrize || 0));
 
           if (matchCount === 6) {
             grade = '1등';
@@ -101,40 +121,57 @@ export default function RewardDetailPage() {
             grade = '3등';
             prizeAmount = thirdPrize;
           }
+          
+          console.log(`✅ ${grade} 당첨 확인 - 상금: ${prizeAmount} KAIA`);
+        } else {
+          console.warn('⚠️ 상금 정보를 찾을 수 없습니다');
         }
 
         // 추첨 일자 (회차의 drawTimestamp)
-        const draw = await contract.draws(drawId);
-        const drawTimestamp = Number(draw.drawTimestamp || draw[0] || 0);
-        const drawDate = drawTimestamp > 0 
-          ? new Date(drawTimestamp * 1000)
-          : new Date();
-        const formattedDrawDate = `${drawDate.getFullYear()}.${String(drawDate.getMonth() + 1).padStart(2, '0')}.${String(drawDate.getDate()).padStart(2, '0')}`;
+        let formattedDrawDate = '-';
+        try {
+          const draw = await contract.draws(drawId);
+          const drawTimestamp = Number(draw?.drawTimestamp || draw?.[0] || 0);
+          if (drawTimestamp > 0) {
+            const drawDate = new Date(drawTimestamp * 1000);
+            formattedDrawDate = `${drawDate.getFullYear()}.${String(drawDate.getMonth() + 1).padStart(2, '0')}.${String(drawDate.getDate()).padStart(2, '0')}`;
+          }
+        } catch (e) {
+          console.warn('⚠️ 추첨 일자 조회 실패');
+        }
 
         // 구매(수령) 일자 - 티켓 구매 이벤트의 블록 타임스탬프
-        const ticketFilter = contract.filters.TicketPurchased(address, tokenId, drawId);
-        const ticketEvents = await contract.queryFilter(ticketFilter, fromBlock, 'latest');
-        
         let receiptDate = formattedDrawDate;
         let txHash = '';
         
-        if (ticketEvents.length > 0) {
-          const ticketEvent = ticketEvents[0] as any;
-          txHash = ticketEvent.transactionHash || '';
+        try {
+          const ticketFilter = contract.filters.TicketPurchased(address, tokenId, drawId);
+          const ticketEvents = await contract.queryFilter(ticketFilter, fromBlock, 'latest');
           
-          const block = await provider.getBlock(ticketEvent.blockNumber);
-          if (block) {
-            const purchaseDate = new Date(Number(block.timestamp) * 1000);
-            receiptDate = `${purchaseDate.getFullYear()}.${String(purchaseDate.getMonth() + 1).padStart(2, '0')}.${String(purchaseDate.getDate()).padStart(2, '0')}`;
+          if (ticketEvents && ticketEvents.length > 0) {
+            const ticketEvent = ticketEvents[0] as any;
+            txHash = ticketEvent?.transactionHash || '';
+            
+            if (ticketEvent?.blockNumber) {
+              const block = await provider.getBlock(ticketEvent.blockNumber);
+              if (block && block.timestamp) {
+                const purchaseDate = new Date(Number(block.timestamp) * 1000);
+                receiptDate = `${purchaseDate.getFullYear()}.${String(purchaseDate.getMonth() + 1).padStart(2, '0')}.${String(purchaseDate.getDate()).padStart(2, '0')}`;
+              }
+            }
           }
+        } catch (e) {
+          console.warn('⚠️ 구매 일자 조회 실패:', e);
         }
+
+        const prizeKRW = isNaN(prizeAmount) || isNaN(kaiaPrice) ? 0 : Math.floor(prizeAmount * kaiaPrice);
 
         setDetail({
           drawId,
           tokenId,
-          grade,
-          prizeAmount,
-          prizeKRW: Math.floor(prizeAmount * kaiaPrice),
+          grade: grade || '-',
+          prizeAmount: isNaN(prizeAmount) ? 0 : prizeAmount,
+          prizeKRW,
           drawDate: formattedDrawDate,
           receiptDate,
           winningNumbers: winningNums,
@@ -142,8 +179,11 @@ export default function RewardDetailPage() {
           transactionHash: txHash,
         });
 
+        console.log('✅ 상세 정보 로드 완료');
+
       } catch (error) {
         console.error('보상 상세 정보 로드 실패:', error);
+        setDetail(null);
       } finally {
         setIsLoading(false);
       }
@@ -172,7 +212,7 @@ export default function RewardDetailPage() {
     );
   }
 
-  if (isLoading || !detail) {
+  if (isLoading) {
     return (
       <div
         style={{
@@ -187,6 +227,42 @@ export default function RewardDetailPage() {
         }}
       >
         로딩 중...
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: 'clamp(14px, 3.5vw, 16px)',
+          gap: '20px',
+        }}
+      >
+        <div>보상 정보를 찾을 수 없습니다</div>
+        <button
+          onClick={() => router.push('/my')}
+          style={{
+            padding: '12px 24px',
+            background: '#93EE00',
+            color: '#000',
+            border: 'none',
+            borderRadius: '10px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          돌아가기
+        </button>
       </div>
     );
   }

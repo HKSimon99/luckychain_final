@@ -25,7 +25,7 @@ export default function WinnersResultPage() {
   const router = useRouter();
   const params = useParams();
   const { kaiaPrice } = useKaiaPrice();
-  const drawId = parseInt(params.drawId as string);
+  const drawId = params.drawId ? parseInt(params.drawId as string) : 0;
 
   const [searchInput, setSearchInput] = useState('');
   const [winningNumbers, setWinningNumbers] = useState<number[]>([]);
@@ -38,6 +38,14 @@ export default function WinnersResultPage() {
 
   useEffect(() => {
     const loadDrawResults = async () => {
+      if (!drawId || isNaN(drawId) || drawId <= 0) {
+        console.warn('⚠️ 유효하지 않은 drawId:', drawId);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+
       try {
         const provider = new ethers.JsonRpcProvider(rpcUrl);
         const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
@@ -62,27 +70,39 @@ export default function WinnersResultPage() {
 
         // 2. 상금 정보 조회 (PrizesDistributed 이벤트)
         const currentBlock = await provider.getBlockNumber();
-        const fromBlock = Math.max(0, currentBlock - 500000);
+        const fromBlock = Math.max(0, currentBlock - 2000000);
+        
+        console.log(`📊 회차 ${drawId} - 블록 범위: ${fromBlock} ~ ${currentBlock}`);
         
         const prizeFilter = contract.filters.PrizesDistributed(drawId);
         const prizeEvents = await contract.queryFilter(prizeFilter, fromBlock, 'latest');
 
+        console.log(`💰 PrizesDistributed 이벤트: ${prizeEvents.length}개 발견`);
+
         let firstPrize = 0, secondPrize = 0, thirdPrize = 0;
         let firstCount = 0, secondCount = 0, thirdCount = 0;
 
-        if (prizeEvents.length > 0) {
+        if (prizeEvents && prizeEvents.length > 0) {
           const prizeEvent = prizeEvents[0] as any;
-          firstCount = Number(prizeEvent.args.firstWinners || 0);
-          secondCount = Number(prizeEvent.args.secondWinners || 0);
-          thirdCount = Number(prizeEvent.args.thirdWinners || 0);
-          firstPrize = Number(ethers.formatEther(prizeEvent.args.firstPrize || 0));
-          secondPrize = Number(ethers.formatEther(prizeEvent.args.secondPrize || 0));
-          thirdPrize = Number(ethers.formatEther(prizeEvent.args.thirdPrize || 0));
+          firstCount = Number(prizeEvent.args?.firstWinners || 0);
+          secondCount = Number(prizeEvent.args?.secondWinners || 0);
+          thirdCount = Number(prizeEvent.args?.thirdWinners || 0);
+          firstPrize = Number(ethers.formatEther(prizeEvent.args?.firstPrize || 0));
+          secondPrize = Number(ethers.formatEther(prizeEvent.args?.secondPrize || 0));
+          thirdPrize = Number(ethers.formatEther(prizeEvent.args?.thirdPrize || 0));
+          
+          console.log(`💰 당첨자: 1등=${firstCount}, 2등=${secondCount}, 3등=${thirdCount}`);
+          console.log(`💰 상금: 1등=${firstPrize}, 2등=${secondPrize}, 3등=${thirdPrize} KAIA`);
+        } else {
+          console.warn(`⚠️ ${drawId}회차 상금 정보를 찾을 수 없습니다`);
         }
 
-        const total = firstPrize * firstCount + secondPrize * secondCount + thirdPrize * thirdCount;
-        setTotalPrize(total.toFixed(2));
-        setTotalPrizeKRW(Math.floor(total * kaiaPrice).toLocaleString('ko-KR'));
+        const total = (firstPrize * firstCount) + (secondPrize * secondCount) + (thirdPrize * thirdCount);
+        const totalFixed = isNaN(total) ? '0' : total.toFixed(2);
+        const totalKRW = isNaN(total) || isNaN(kaiaPrice) ? '0' : Math.floor(total * kaiaPrice).toLocaleString('ko-KR');
+        
+        setTotalPrize(totalFixed);
+        setTotalPrizeKRW(totalKRW);
 
         // 3. 참여자 수 조회 (TicketPurchased 이벤트)
         const ticketFilter = contract.filters.TicketPurchased(null, null, drawId);
@@ -93,7 +113,7 @@ export default function WinnersResultPage() {
         // 4. 당첨자 정보 구성
         const winnerList: WinnerInfo[] = [];
 
-        if (firstCount > 0) {
+        if (firstCount > 0 && firstPrize > 0) {
           winnerList.push({
             grade: '1등',
             match: '6개 일치',
@@ -101,11 +121,11 @@ export default function WinnersResultPage() {
             reward: `${firstPrize.toFixed(2)} KAIA`,
             rewardKRW: `₩${Math.floor(firstPrize * kaiaPrice).toLocaleString('ko-KR')}`,
             numbers: nums,
-            ticketCount: totalTickets, // 총 구매 장수 사용
+            ticketCount: totalTickets,
           });
         }
 
-        if (secondCount > 0) {
+        if (secondCount > 0 && secondPrize > 0) {
           winnerList.push({
             grade: '2등',
             match: '5개 일치',
@@ -113,11 +133,11 @@ export default function WinnersResultPage() {
             reward: `${secondPrize.toFixed(2)} KAIA`,
             rewardKRW: `₩${Math.floor(secondPrize * kaiaPrice).toLocaleString('ko-KR')}`,
             numbers: nums,
-            ticketCount: totalTickets, // 총 구매 장수 사용
+            ticketCount: totalTickets,
           });
         }
 
-        if (thirdCount > 0) {
+        if (thirdCount > 0 && thirdPrize > 0) {
           winnerList.push({
             grade: '3등',
             match: '4개 일치',
@@ -125,7 +145,7 @@ export default function WinnersResultPage() {
             reward: `${thirdPrize.toFixed(2)} KAIA`,
             rewardKRW: `₩${Math.floor(thirdPrize * kaiaPrice).toLocaleString('ko-KR')}`,
             numbers: nums,
-            ticketCount: totalTickets, // 총 구매 장수 사용
+            ticketCount: totalTickets,
           });
         }
 
@@ -133,14 +153,14 @@ export default function WinnersResultPage() {
 
       } catch (error) {
         console.error('회차 결과 로드 실패:', error);
+        setWinners([]);
+        setWinningNumbers([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (drawId) {
-      loadDrawResults();
-    }
+    loadDrawResults();
   }, [drawId, kaiaPrice]);
 
   const handleSearch = () => {
@@ -171,6 +191,25 @@ export default function WinnersResultPage() {
         }}
       >
         로딩 중...
+      </div>
+    );
+  }
+
+  if (!drawId || isNaN(drawId) || drawId <= 0) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: 'clamp(14px, 3.5vw, 16px)',
+        }}
+      >
+        유효하지 않은 회차입니다
       </div>
     );
   }
