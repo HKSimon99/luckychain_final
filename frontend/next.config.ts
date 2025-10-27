@@ -15,6 +15,17 @@ const nextConfig: NextConfig = {
   // React Strict Mode 비활성화 (중복 초기화 방지)
   reactStrictMode: false,
 
+  // 서버 외부 패키지 (Next.js 15+)
+  serverExternalPackages: [
+    'lit',
+    'lit-html',
+    'lit-element',
+    '@lit/reactive-element',
+    '@reown/appkit',
+    '@reown/appkit-utils',
+    '@reown/appkit-common',
+  ],
+
   // 실험적 기능 활성화
   experimental: {
     optimizePackageImports: ['ethers', '@web3modal/wagmi', 'wagmi', 'viem'],
@@ -37,7 +48,12 @@ const nextConfig: NextConfig = {
       config.externals.push(
         'pino-pretty',
         'lit',
+        'lit-html',
+        'lit-element',
         '@lit/reactive-element',
+        '@reown/appkit',
+        '@reown/appkit-utils',
+        '@reown/appkit-common',
         'lokijs',
         'encoding'
       );
