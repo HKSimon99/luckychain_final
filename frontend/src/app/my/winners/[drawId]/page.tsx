@@ -11,6 +11,10 @@ const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
 const rpcUrl = 'https://public-en-kairos.node.kaia.io';
 
+// Next.js 15 동적 라우트 설정
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+
 interface WinnerInfo {
   grade: string;
   match: string;
@@ -21,17 +25,13 @@ interface WinnerInfo {
   ticketCount: number;
 }
 
-export default function WinnersResultPage() {
+interface PageProps {
+  params: Promise<{ drawId: string }>;
+}
+
+function WinnersResultPageContent({ drawId }: { drawId: number }) {
   const router = useRouter();
-  const params = useParams();
   const { kaiaPrice } = useKaiaPrice();
-  
-  // 안전하게 drawId 파싱
-  const drawId = React.useMemo(() => {
-    if (!params || !params.drawId) return 0;
-    const parsed = parseInt(params.drawId as string);
-    return isNaN(parsed) ? 0 : parsed;
-  }, [params]);
 
   const [searchInput, setSearchInput] = useState('');
   const [winningNumbers, setWinningNumbers] = useState<number[]>([]);
@@ -712,5 +712,31 @@ export default function WinnersResultPage() {
       </div>
     </div>
   );
+}
+
+export default async function WinnersResultPage({ params }: PageProps) {
+  const resolvedParams = await params;
+  const drawId = parseInt(resolvedParams.drawId);
+  
+  if (isNaN(drawId) || drawId <= 0) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: 'clamp(14px, 3.5vw, 16px)',
+        }}
+      >
+        유효하지 않은 회차입니다
+      </div>
+    );
+  }
+
+  return <WinnersResultPageContent drawId={drawId} />;
 }
 

@@ -13,6 +13,10 @@ const lottoAbi = (lottoAbiModule as any).default || lottoAbiModule;
 const contractAddress = '0x1D8E07AE314204F97611e1469Ee81c64b80b47F1';
 const rpcUrl = 'https://public-en-kairos.node.kaia.io';
 
+// Next.js 15 동적 라우트 설정
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+
 interface RewardDetail {
   drawId: number;
   tokenId: number;
@@ -26,9 +30,12 @@ interface RewardDetail {
   transactionHash: string;
 }
 
-export default function RewardDetailPage() {
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+function RewardDetailPageContent({ rewardId }: { rewardId: string }) {
   const router = useRouter();
-  const params = useParams();
   const { address, isConnected } = useAccount();
   const { walletProvider } = useAppKitProvider('eip155');
   const { kaiaPrice } = useKaiaPrice();
@@ -38,8 +45,8 @@ export default function RewardDetailPage() {
 
   useEffect(() => {
     const loadDetail = async () => {
-      if (!isConnected || !address || !params.id) {
-        console.warn('⚠️ 필수 데이터 누락:', { isConnected, address, id: params.id });
+      if (!isConnected || !address || !rewardId) {
+        console.warn('⚠️ 필수 데이터 누락:', { isConnected, address, rewardId });
         setIsLoading(false);
         return;
       }
@@ -53,7 +60,7 @@ export default function RewardDetailPage() {
 
       try {
         // ID 파싱 (형식: "drawId-tokenId")
-        const idString = params.id as string;
+        const idString = rewardId;
         if (!idString || typeof idString !== 'string') {
           throw new Error('Invalid ID format');
         }
@@ -190,7 +197,7 @@ export default function RewardDetailPage() {
     };
 
     loadDetail();
-  }, [params.id, address, isConnected, walletProvider, kaiaPrice]);
+  }, [rewardId, address, isConnected, walletProvider, kaiaPrice]);
 
   if (!isConnected) {
     return (
@@ -592,5 +599,31 @@ export default function RewardDetailPage() {
       </div>
     </div>
   );
+}
+
+export default async function RewardDetailPage({ params }: PageProps) {
+  const resolvedParams = await params;
+  const rewardId = resolvedParams.id;
+  
+  if (!rewardId || typeof rewardId !== 'string') {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: 'clamp(14px, 3.5vw, 16px)',
+        }}
+      >
+        유효하지 않은 보상 ID입니다
+      </div>
+    );
+  }
+
+  return <RewardDetailPageContent rewardId={rewardId} />;
 }
 
