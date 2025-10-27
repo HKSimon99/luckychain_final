@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useAppKitProvider } from '@reown/appkit/react';
@@ -167,16 +167,16 @@ export default function RewardDetailPage() {
         const prizeKRW = isNaN(prizeAmount) || isNaN(kaiaPrice) ? 0 : Math.floor(prizeAmount * kaiaPrice);
 
         setDetail({
-          drawId,
-          tokenId,
+          drawId: drawId || 0,
+          tokenId: tokenId || 0,
           grade: grade || '-',
           prizeAmount: isNaN(prizeAmount) ? 0 : prizeAmount,
-          prizeKRW,
-          drawDate: formattedDrawDate,
-          receiptDate,
-          winningNumbers: winningNums,
-          myNumbers: myNums,
-          transactionHash: txHash,
+          prizeKRW: prizeKRW || 0,
+          drawDate: formattedDrawDate || '-',
+          receiptDate: receiptDate || '-',
+          winningNumbers: winningNums || [],
+          myNumbers: myNums || [],
+          transactionHash: txHash || '',
         });
 
         console.log('✅ 상세 정보 로드 완료');
@@ -472,8 +472,8 @@ export default function RewardDetailPage() {
               justifyContent: 'space-between',
             }}
           >
-            {detail.myNumbers.map((num, idx) => {
-              const isMatched = detail.winningNumbers.includes(num);
+            {(detail.myNumbers || []).map((num, idx) => {
+              const isMatched = (detail.winningNumbers || []).includes(num);
               return (
                 <div
                   key={idx}

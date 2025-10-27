@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ethers } from 'ethers';
 import MobileStatusBar from '@/components/MobileStatusBar';
@@ -25,7 +25,13 @@ export default function WinnersResultPage() {
   const router = useRouter();
   const params = useParams();
   const { kaiaPrice } = useKaiaPrice();
-  const drawId = params.drawId ? parseInt(params.drawId as string) : 0;
+  
+  // 안전하게 drawId 파싱
+  const drawId = React.useMemo(() => {
+    if (!params || !params.drawId) return 0;
+    const parsed = parseInt(params.drawId as string);
+    return isNaN(parsed) ? 0 : parsed;
+  }, [params]);
 
   const [searchInput, setSearchInput] = useState('');
   const [winningNumbers, setWinningNumbers] = useState<number[]>([]);
@@ -645,7 +651,7 @@ export default function WinnersResultPage() {
                     gap: 'clamp(4px, 1vw, 6px)',
                   }}
                 >
-                  {info.numbers.map((num, nIdx) => (
+                  {(info.numbers || []).map((num, nIdx) => (
                     <div
                       key={nIdx}
                       style={{
