@@ -7,9 +7,9 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 60,
   },
 
-  // 컴파일러 최적화
+  // 컴파일러 최적화 (디버깅을 위해 임시로 console.log 유지)
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: false, // 임시로 비활성화
   },
 
   // React Strict Mode 비활성화 (중복 초기화 방지)
