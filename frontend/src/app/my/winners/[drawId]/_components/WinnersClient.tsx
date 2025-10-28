@@ -68,9 +68,13 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
         }
         setAvailableDrawIds(pastDrawIds);
 
-        // 당첨 번호 조회
-        const nums = await contract.getWinningNumbers(drawId);
-        const numArray = nums.map((n: any) => Number(n)).sort((a: number, b: number) => a - b);
+        // 당첨 번호 조회 (개별 인덱스로)
+        const numArray: number[] = [];
+        for (let i = 0; i < 6; i++) {
+          const num = await contract.winningNumbers(drawId, i);
+          numArray.push(Number(num));
+        }
+        numArray.sort((a, b) => a - b);
         setWinningNumbers(numArray);
 
         // 총 상금 조회
@@ -79,13 +83,22 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
         setTotalPrize(totalPrizeEther);
         setTotalPrizeKRW(Math.floor(parseFloat(totalPrizeEther) * kaiaPrice).toLocaleString('ko-KR'));
 
-        // 총 참여자 수 조회
+        // 총 참여자 수 조회 및 티켓 번호 맵 생성
         const filter = contract.filters.TicketPurchased(null, drawId);
         const currentBlock = await provider.getBlockNumber();
         const fromBlock = Math.max(0, currentBlock - 2000000);
         const events = await contract.queryFilter(filter, fromBlock, 'latest');
         const uniqueUsers = new Set(events.map((e: any) => e.args[0]));
         setTotalParticipants(uniqueUsers.size);
+
+        // TokenId별 번호 맵 생성 (성능 최적화)
+        const ticketNumbersMap = new Map<number, number[]>();
+        for (const event of events) {
+          if (!('args' in event)) continue;
+          const tokenId = Number(event.args[2]);
+          const numbers = event.args[3].map((n: any) => Number(n));
+          ticketNumbersMap.set(tokenId, numbers);
+        }
 
         // 당첨자 정보 조회
         const firstPrizeWei = await contract.firstPrize(drawId);
@@ -110,8 +123,12 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
           const winner = event.args[2];
           const rank = event.args[3];
 
-          const ticketNums = await contract.ticketNumbers(tokenId);
-          const ticketArray = ticketNums.map((n: any) => Number(n));
+          // 맵에서 티켓 번호 가져오기
+          const ticketArray = ticketNumbersMap.get(tokenId);
+          if (!ticketArray) {
+            console.warn(`TokenId ${tokenId}의 번호를 찾을 수 없습니다`);
+            continue;
+          }
           const matchCount = ticketArray.filter((n: number) => numArray.includes(n)).length;
 
           let rankStr = '';
