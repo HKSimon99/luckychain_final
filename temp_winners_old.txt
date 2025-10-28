@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { ethers } from 'ethers';
 import MobileStatusBar from '@/components/MobileStatusBar';
 import { useKaiaPrice } from '@/contexts/KaiaPriceContext';
@@ -21,15 +21,12 @@ interface WinnerInfo {
   ticketCount: number;
 }
 
-interface WinnersClientProps {
-  initialDrawId: number;
-}
-
-export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
+export default function WinnersResultPage() {
   const router = useRouter();
+  const params = useParams();
   const { kaiaPrice } = useKaiaPrice();
-  
-  const [drawId, setDrawId] = useState<number>(initialDrawId);
+  const drawId = params.drawId ? parseInt(params.drawId as string) : 0;
+
   const [searchInput, setSearchInput] = useState('');
   const [winningNumbers, setWinningNumbers] = useState<number[]>([]);
   const [totalPrize, setTotalPrize] = useState('0');
@@ -38,13 +35,11 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
   const [winners, setWinners] = useState<WinnerInfo[]>([]);
   const [availableDrawIds, setAvailableDrawIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // 회차 데이터 로드
   useEffect(() => {
-    const loadDrawData = async () => {
-      if (isNaN(drawId) || !drawId || drawId <= 0) {
-        setError('유효하지 않은 회차 번호입니다');
+    const loadDrawResults = async () => {
+      if (!drawId || isNaN(drawId) || drawId <= 0) {
+        console.warn('⚠️ 유효하지 않은 drawId:', drawId);
         setIsLoading(false);
         return;
       }
@@ -55,116 +50,117 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
         const provider = new ethers.JsonRpcProvider(rpcUrl);
         const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
 
-        // 현재 회차 확인
-        const currentDrawId = await contract.currentDrawId();
-        const current = Number(currentDrawId);
-
-        // 빠른 조회용 회차 목록 생성 (최대 8개)
-        const pastDrawIds: number[] = [];
-        for (let i = Math.max(1, current - 1); i >= Math.max(1, current - 8); i--) {
-          pastDrawIds.push(i);
-        }
-        setAvailableDrawIds(pastDrawIds);
-
-        // 당첨 번호 조회 (개별 인덱스로)
-        const numArray: number[] = [];
+        // 1. 당첨 번호 조회 (오름차순 정렬)
+        const nums: number[] = [];
         for (let i = 0; i < 6; i++) {
           const num = await contract.winningNumbers(drawId, i);
-          numArray.push(Number(num));
+          nums.push(Number(num));
         }
-        numArray.sort((a, b) => a - b);
-        setWinningNumbers(numArray);
+        nums.sort((a, b) => a - b); // 오름차순 정렬
+        setWinningNumbers(nums);
 
-        // 총 참여자 수 조회 및 티켓 번호 맵 생성
-        const filter = contract.filters.TicketPurchased(null, drawId);
+        // 빠른 조회용 회차 목록 생성 (최대 8개)
+        const currentDrawId = await contract.currentDrawId();
+        const current = Number(currentDrawId);
+        const draws: number[] = [];
+        for (let i = Math.max(1, current - 1); i >= Math.max(1, current - 8); i--) {
+          draws.push(i);
+        }
+        setAvailableDrawIds(draws);
+
+        // 2. 상금 정보 조회 (PrizesDistributed 이벤트)
         const currentBlock = await provider.getBlockNumber();
         const fromBlock = Math.max(0, currentBlock - 2000000);
-        const events = await contract.queryFilter(filter, fromBlock, 'latest');
-        const uniqueUsers = new Set(events.map((e: any) => e.args[0]));
-        setTotalParticipants(events.length);
-
-        // TokenId별 번호 맵 생성 (성능 최적화)
-        const ticketNumbersMap = new Map<number, number[]>();
-        for (const event of events) {
-          if (!('args' in event)) continue;
-          const tokenId = Number(event.args[2]);
-          const numbers = event.args[3].map((n: any) => Number(n));
-          ticketNumbersMap.set(tokenId, numbers);
-        }
-
-        // PrizesDistributed 이벤트로 상금 정보 조회
+        
+        console.log(`📊 회차 ${drawId} - 블록 범위: ${fromBlock} ~ ${currentBlock}`);
+        
         const prizeFilter = contract.filters.PrizesDistributed(drawId);
         const prizeEvents = await contract.queryFilter(prizeFilter, fromBlock, 'latest');
 
-        let firstPrize = 0;
-        let secondPrize = 0;
-        let thirdPrize = 0;
+        console.log(`💰 PrizesDistributed 이벤트: ${prizeEvents.length}개 발견`);
 
-        if (prizeEvents.length > 0 && 'args' in prizeEvents[0]) {
-          firstPrize = parseFloat(ethers.formatEther(prizeEvents[0].args[4]));
-          secondPrize = parseFloat(ethers.formatEther(prizeEvents[0].args[5]));
-          thirdPrize = parseFloat(ethers.formatEther(prizeEvents[0].args[6]));
+        let firstPrize = 0, secondPrize = 0, thirdPrize = 0;
+        let firstCount = 0, secondCount = 0, thirdCount = 0;
+
+        if (prizeEvents && prizeEvents.length > 0) {
+          const prizeEvent = prizeEvents[0] as any;
+          firstCount = Number(prizeEvent.args?.firstWinners || 0);
+          secondCount = Number(prizeEvent.args?.secondWinners || 0);
+          thirdCount = Number(prizeEvent.args?.thirdWinners || 0);
+          firstPrize = Number(ethers.formatEther(prizeEvent.args?.firstPrize || 0));
+          secondPrize = Number(ethers.formatEther(prizeEvent.args?.secondPrize || 0));
+          thirdPrize = Number(ethers.formatEther(prizeEvent.args?.thirdPrize || 0));
+          
+          console.log(`💰 당첨자: 1등=${firstCount}, 2등=${secondCount}, 3등=${thirdCount}`);
+          console.log(`💰 상금: 1등=${firstPrize}, 2등=${secondPrize}, 3등=${thirdPrize} KAIA`);
+        } else {
+          console.warn(`⚠️ ${drawId}회차 상금 정보를 찾을 수 없습니다`);
         }
 
-        // 총 상금 계산
-        const totalPrizeValue = firstPrize + secondPrize + thirdPrize;
-        setTotalPrize(totalPrizeValue.toFixed(2));
-        setTotalPrizeKRW(Math.floor(totalPrizeValue * kaiaPrice).toLocaleString('ko-KR'));
+        const total = (firstPrize * firstCount) + (secondPrize * secondCount) + (thirdPrize * thirdCount);
+        const totalFixed = isNaN(total) ? '0' : total.toFixed(2);
+        const totalKRW = isNaN(total) || isNaN(kaiaPrice) ? '0' : Math.floor(total * kaiaPrice).toLocaleString('ko-KR');
+        
+        setTotalPrize(totalFixed);
+        setTotalPrizeKRW(totalKRW);
 
-        // 모든 티켓 중에서 당첨된 티켓 찾기
-        const winnerMap = new Map<string, { tokenIds: number[]; rank: string; prize: number }>();
+        // 3. 참여자 수 조회 (TicketPurchased 이벤트)
+        const ticketFilter = contract.filters.TicketPurchased(null, null, drawId);
+        const ticketEvents = await contract.queryFilter(ticketFilter, fromBlock, 'latest');
+        const totalTickets = ticketEvents.length; // 해당 회차의 총 구매 장수
+        setTotalParticipants(totalTickets);
 
-        for (const [tokenId, ticketArray] of ticketNumbersMap.entries()) {
-          const matchCount = ticketArray.filter((n: number) => numArray.includes(n)).length;
-
-          let rankStr = '';
-          let prizeAmount = 0;
-          if (matchCount === 6) {
-            rankStr = '1등';
-            prizeAmount = firstPrize;
-          } else if (matchCount === 5) {
-            rankStr = '2등';
-            prizeAmount = secondPrize;
-          } else if (matchCount === 4) {
-            rankStr = '3등';
-            prizeAmount = thirdPrize;
-          } else {
-            continue;
-          }
-
-          if (!winnerMap.has(rankStr)) {
-            winnerMap.set(rankStr, { tokenIds: [], rank: rankStr, prize: prizeAmount });
-          }
-          winnerMap.get(rankStr)!.tokenIds.push(tokenId);
-        }
-
+        // 4. 당첨자 정보 구성
         const winnerList: WinnerInfo[] = [];
-        for (const [rankStr, data] of winnerMap.entries()) {
-          const matchCount = rankStr === '1등' ? 6 : rankStr === '2등' ? 5 : 4;
+
+        if (firstCount > 0 && firstPrize > 0) {
           winnerList.push({
-            grade: rankStr,
-            match: `${matchCount}개 일치`,
-            winner: `${data.tokenIds.length}명 당첨`,
-            reward: `${data.prize.toFixed(2)} KAIA`,
-            rewardKRW: `₩${Math.floor(data.prize * kaiaPrice).toLocaleString('ko-KR')}`,
-            numbers: numArray,
-            ticketCount: events.length,
+            grade: '1등',
+            match: '6개 일치',
+            winner: `${firstCount}명 당첨`,
+            reward: `${firstPrize.toFixed(2)} KAIA`,
+            rewardKRW: `₩${Math.floor(firstPrize * kaiaPrice).toLocaleString('ko-KR')}`,
+            numbers: nums,
+            ticketCount: totalTickets,
           });
         }
 
-        const sortOrder = { '1등': 1, '2등': 2, '3등': 3 };
-        winnerList.sort((a, b) => sortOrder[a.grade as keyof typeof sortOrder] - sortOrder[b.grade as keyof typeof sortOrder]);
+        if (secondCount > 0 && secondPrize > 0) {
+          winnerList.push({
+            grade: '2등',
+            match: '5개 일치',
+            winner: `${secondCount}명 당첨`,
+            reward: `${secondPrize.toFixed(2)} KAIA`,
+            rewardKRW: `₩${Math.floor(secondPrize * kaiaPrice).toLocaleString('ko-KR')}`,
+            numbers: nums,
+            ticketCount: totalTickets,
+          });
+        }
+
+        if (thirdCount > 0 && thirdPrize > 0) {
+          winnerList.push({
+            grade: '3등',
+            match: '4개 일치',
+            winner: `${thirdCount}명 당첨`,
+            reward: `${thirdPrize.toFixed(2)} KAIA`,
+            rewardKRW: `₩${Math.floor(thirdPrize * kaiaPrice).toLocaleString('ko-KR')}`,
+            numbers: nums,
+            ticketCount: totalTickets,
+          });
+        }
 
         setWinners(winnerList);
+
       } catch (error) {
-        console.error('회차 데이터 로드 오류:', error);
-        setError('회차 데이터를 불러오는데 실패했습니다');
+        console.error('회차 결과 로드 실패:', error);
+        setWinners([]);
+        setWinningNumbers([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadDrawData();
+    loadDrawResults();
   }, [drawId, kaiaPrice]);
 
   const handleSearch = () => {
@@ -179,42 +175,6 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
     if (grade === '2등') return 'linear-gradient(135deg, #D2D2D2 0%, #787878 100%)';
     return 'linear-gradient(135deg, #FFB048 0%, #DA4C00 100%)';
   };
-
-  if (error) {
-    return (
-      <div
-        style={{
-          width: '100%',
-          height: '100vh',
-          background: '#380D44',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          gap: '20px',
-        }}
-      >
-        <div style={{ fontSize: '24px' }}>⚠️</div>
-        <div style={{ fontSize: '16px' }}>{error}</div>
-        <button
-          onClick={() => router.push('/my/winners')}
-          style={{
-            padding: '12px 24px',
-            background: '#93EE00',
-            color: '#000',
-            border: 'none',
-            borderRadius: '10px',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          검색 페이지로 돌아가기
-        </button>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -231,6 +191,25 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
         }}
       >
         로딩 중...
+      </div>
+    );
+  }
+
+  if (!drawId || isNaN(drawId) || drawId <= 0) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100vh',
+          background: '#380D44',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: 'clamp(14px, 3.5vw, 16px)',
+        }}
+      >
+        유효하지 않은 회차입니다
       </div>
     );
   }
@@ -385,8 +364,8 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
                 style={{
                   flex: '0 0 auto',
                   width: 'clamp(70px, 17.5vw, 75px)',
-                  background: id === drawId
-                    ? 'linear-gradient(122deg, #B715BF 0%, #C10E8E 100%)'
+                  background: id === drawId 
+                    ? 'linear-gradient(122deg, #B715BF 0%, #C10E8E 100%)' 
                     : 'rgba(217,217,217,0.3)',
                   border: '1px solid rgba(255,255,255,0.2)',
                   borderRadius: 'clamp(8px, 2vw, 10px)',
@@ -728,3 +707,4 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
     </div>
   );
 }
+
