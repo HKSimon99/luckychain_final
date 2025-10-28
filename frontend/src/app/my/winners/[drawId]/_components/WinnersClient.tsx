@@ -77,12 +77,6 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
         numArray.sort((a, b) => a - b);
         setWinningNumbers(numArray);
 
-        // 총 상금 조회
-        const totalPrizeWei = await contract.getTotalPrizeForDraw(drawId);
-        const totalPrizeEther = ethers.formatEther(totalPrizeWei);
-        setTotalPrize(totalPrizeEther);
-        setTotalPrizeKRW(Math.floor(parseFloat(totalPrizeEther) * kaiaPrice).toLocaleString('ko-KR'));
-
         // 총 참여자 수 조회 및 티켓 번호 맵 생성
         const filter = contract.filters.TicketPurchased(null, drawId);
         const currentBlock = await provider.getBlockNumber();
@@ -108,6 +102,11 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
         const firstPrize = parseFloat(ethers.formatEther(firstPrizeWei));
         const secondPrize = parseFloat(ethers.formatEther(secondPrizeWei));
         const thirdPrize = parseFloat(ethers.formatEther(thirdPrizeWei));
+
+        // 총 상금 계산 (1등 + 2등 + 3등)
+        const totalPrizeValue = firstPrize + secondPrize + thirdPrize;
+        setTotalPrize(totalPrizeValue.toFixed(2));
+        setTotalPrizeKRW(Math.floor(totalPrizeValue * kaiaPrice).toLocaleString('ko-KR'));
 
         // PrizesDistributed 이벤트로 당첨자 조회
         const prizeFilter = contract.filters.PrizesDistributed(drawId);

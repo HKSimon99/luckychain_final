@@ -94,20 +94,23 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         // 내 번호 조회 (TicketPurchased 이벤트에서)
         console.log('3️⃣ 내 번호 조회 중... (tokenId:', tokenId, ')');
         const currentBlock = await provider.getBlockNumber();
-        const fromBlock = Math.max(0, currentBlock - 2000000);
+        // 블록 범위를 더 넓게 (약 69일)
+        const fromBlock = Math.max(0, currentBlock - 6000000);
         console.log('  - 블록 범위:', fromBlock, '~', currentBlock);
         
-        const ticketFilter = contract.filters.TicketPurchased(null, drawId);
-        console.log('  - TicketPurchased 이벤트 조회 중...');
+        // TokenId는 전체 시스템에서 유니크하므로 drawId 필터 제거
+        const ticketFilter = contract.filters.TicketPurchased();
+        console.log('  - TicketPurchased 이벤트 조회 중 (모든 회차)...');
         
         const ticketEvents = await contract.queryFilter(ticketFilter, fromBlock, 'latest');
-        console.log('  - 찾은 이벤트:', ticketEvents.length, '개');
+        console.log('  - 전체 이벤트:', ticketEvents.length, '개');
         
         // 해당 tokenId의 이벤트 찾기
         let myNumArray: number[] = [];
         for (const event of ticketEvents) {
           if (!('args' in event)) continue;
           const eventTokenId = Number(event.args[2]);
+          console.log('  - 확인 중: TokenId', eventTokenId);
           if (eventTokenId === tokenId) {
             const numbers = event.args[3];
             myNumArray = numbers.map((n: any) => Number(n));
@@ -117,7 +120,8 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         }
         
         if (myNumArray.length === 0) {
-          throw new Error(`TokenId ${tokenId}의 티켓 정보를 찾을 수 없습니다`);
+          console.error('❌ TokenId', tokenId, '를 찾지 못했습니다. 조회된 TokenId들:', ticketEvents.filter((e: any) => 'args' in e).map((e: any) => Number(e.args[2])));
+          throw new Error(`TokenId ${tokenId}의 티켓 정보를 찾을 수 없습니다. 블록 범위: ${fromBlock} ~ ${currentBlock}`);
         }
         
         console.log('✅ 내 번호:', myNumArray);
