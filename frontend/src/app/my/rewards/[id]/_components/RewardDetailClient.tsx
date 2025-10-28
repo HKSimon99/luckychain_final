@@ -180,23 +180,10 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
           console.warn('⚠️ PrizesDistributed 이벤트 없음 (아직 지급되지 않았을 수 있음)');
         }
 
-        // 추첨 날짜 조회 (DrawCompleted 이벤트)
-        console.log('7️⃣ DrawCompleted 이벤트 조회 중...');
-        const drawFilter = contract.filters.DrawCompleted(drawId);
-        const drawEvents = await contract.queryFilter(drawFilter, fromBlock, 'latest');
-        console.log('✅ DrawCompleted 이벤트:', drawEvents.length, '개');
-
-        let drawDate = '';
-        if (drawEvents.length > 0) {
-          const block = await provider.getBlock(drawEvents[0].blockNumber);
-          if (block) {
-            const date = new Date(Number(block.timestamp) * 1000);
-            drawDate = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-            console.log('  - 추첨 일시:', drawDate);
-          }
-        } else {
-          console.warn('⚠️ DrawCompleted 이벤트 없음');
-        }
+        // 추첨 날짜는 PrizesDistributed 이벤트와 동일 (같은 타이밍)
+        console.log('7️⃣ 추첨 날짜 설정...');
+        let drawDate = receiptDate; // PrizesDistributed와 동일한 시간
+        console.log('✅ 추첨 일시:', drawDate);
 
         console.log('8️⃣ 최종 데이터 설정 중...');
         const finalDetail = {
