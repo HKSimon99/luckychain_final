@@ -101,9 +101,10 @@ export default function LotteryListPage() {
           try {
             const eventData = event as any;
             
-            const tokenId = Number(eventData.args[1] || eventData.args.tokenId);
-            const drawId = Number(eventData.args[2] || eventData.args.drawId);
-            const numbers = Array.from(eventData.args[3] || eventData.args.numbers || []).map((n: any) => Number(n));
+            // TicketPurchased(address buyer, uint256 ticketId, uint256 drawId, uint8[6] numbers)
+            const tokenId = Number(eventData.args[1]);  // args[1] = ticketId
+            const drawId = Number(eventData.args[2]);   // args[2] = drawId
+            const numbers = Array.from(eventData.args[3] || []).map((n: any) => Number(n));
 
             console.log(`🎫 티켓 #${tokenId} - ${drawId}회차 처리 중...`);
 

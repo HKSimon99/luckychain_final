@@ -78,10 +78,12 @@ export default function RewardsPage() {
         // 회차별로 그룹화하여 처리
         const drawMap = new Map<number, any[]>();
         for (const event of ticketEvents) {
+          if (!('args' in event)) continue;
           const eventData = event as any;
-          const drawId = Number(eventData.args[2] || eventData.args.drawId);
-          const tokenId = Number(eventData.args[1] || eventData.args.tokenId);
-          const numbers = Array.from(eventData.args[3] || eventData.args.numbers || []).map((n: any) => Number(n));
+          // TicketPurchased(address buyer, uint256 ticketId, uint256 drawId, uint8[6] numbers)
+          const tokenId = Number(eventData.args[1]);  // ✅ args[1] = ticketId
+          const drawId = Number(eventData.args[2]);   // ✅ args[2] = drawId
+          const numbers = Array.from(eventData.args[3] || []).map((n: any) => Number(n));
           
           if (!drawMap.has(drawId)) {
             drawMap.set(drawId, []);

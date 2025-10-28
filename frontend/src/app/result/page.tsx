@@ -114,8 +114,9 @@ export default function ResultPage() {
           if (numbers.some(n => n > 0)) {
             for (const event of myDrawTickets) {
               const eventData = event as any;
-              const tokenId = Number(eventData.args[1] || eventData.args.tokenId);
-              const ticketNumbers = Array.from(eventData.args[3] || eventData.args.numbers || []).map((n: any) => Number(n));
+              // TicketPurchased(address buyer, uint256 ticketId, uint256 drawId, uint8[6] numbers)
+              const tokenId = Number(eventData.args[1]);  // args[1] = ticketId
+              const ticketNumbers = Array.from(eventData.args[3] || []).map((n: any) => Number(n));
               
               console.log(`  티켓 #${tokenId} 번호:`, ticketNumbers);
               

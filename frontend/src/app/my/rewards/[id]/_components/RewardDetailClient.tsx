@@ -71,7 +71,7 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
       setIsLoading(true);
 
       try {
-        const drawId = initialDrawId;
+        let drawId = initialDrawId; // ⚠️ let으로 변경 (나중에 실제 drawId로 업데이트)
         const tokenId = initialTokenId;
 
         console.log(`📊 상세 정보 로드 시작: 회차=${drawId}, 티켓=${tokenId}`);
@@ -81,8 +81,58 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         const contract = new ethers.Contract(contractAddress, lottoAbi, provider);
         console.log('✅ RPC Provider 생성 완료');
 
-        // 당첨 번호 조회
-        console.log('2️⃣ 당첨 번호 조회 중...');
+        // 내 번호 조회 (TicketPurchased 이벤트에서 - tokenId로 검색)
+        console.log('3️⃣ 내 번호 조회 중... (tokenId:', tokenId, ')');
+        const currentBlock = await provider.getBlockNumber();
+        const fromBlock = Math.max(0, currentBlock - 6000000);
+        console.log('  - 블록 범위:', fromBlock, '~', currentBlock);
+        
+        // ⚠️ ticketId가 indexed되지 않아서 필터링 불가 → 모든 이벤트 조회 후 클라이언트 측 필터링
+        console.log('  - TicketPurchased 이벤트 조회 중 (필터 없음)...');
+        
+        const ticketFilter = contract.filters.TicketPurchased();
+        const allTicketEvents = await contract.queryFilter(ticketFilter, fromBlock, 'latest');
+        console.log('  - 전체 TicketPurchased 이벤트:', allTicketEvents.length, '개');
+        
+        // 클라이언트 측에서 tokenId로 필터링
+        let myNumArray: number[] = [];
+        let actualDrawId = drawId; // URL의 drawId 사용 (초기값)
+        let found = false;
+        
+        for (const event of allTicketEvents) {
+          if (!('args' in event)) continue;
+          const eventData = event as any;
+          
+          // TicketPurchased(address buyer, uint256 ticketId, uint256 drawId, uint8[6] numbers)
+          const eventTokenId = Number(eventData.args[1]); // args[1] = ticketId
+          
+          if (eventTokenId === tokenId) {
+            actualDrawId = Number(eventData.args[2]); // args[2] = drawId
+            myNumArray = Array.from(eventData.args[3] || []).map((n: any) => Number(n));
+            found = true;
+            console.log('✅ TokenId', tokenId, '찾음! 실제 회차:', actualDrawId, '번호:', myNumArray);
+            
+            // URL의 drawId와 실제 drawId가 다르면 경고
+            if (actualDrawId !== drawId) {
+              console.warn(`⚠️ URL의 drawId(${drawId})와 실제 drawId(${actualDrawId})가 다릅니다!`);
+            }
+            break;
+          }
+        }
+        
+        if (!found) {
+          console.error('❌ TokenId', tokenId, '를 찾지 못했습니다.');
+          console.error('  - 조회된 TokenId 샘플 (최대 10개):', 
+            allTicketEvents.slice(0, 10).filter((e: any) => 'args' in e).map((e: any) => Number(e.args[1])));
+          throw new Error(`TokenId ${tokenId}의 티켓 정보를 찾을 수 없습니다.`);
+        }
+        
+        // 실제 drawId로 업데이트
+        drawId = actualDrawId;
+        console.log('✅ 내 번호:', myNumArray, '/ 실제 회차:', drawId);
+
+        // 실제 drawId로 당첨 번호 조회
+        console.log('4️⃣ 당첨 번호 조회 중... (실제 회차:', drawId, ')');
         const winningNums: number[] = [];
         for (let i = 0; i < 6; i++) {
           const num = await contract.winningNumbers(drawId, i);
@@ -91,43 +141,8 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         winningNums.sort((a, b) => a - b);
         console.log('✅ 당첨 번호:', winningNums);
 
-        // 내 번호 조회 (TicketPurchased 이벤트에서 - drawId로 필터링)
-        console.log('3️⃣ 내 번호 조회 중... (drawId:', drawId, 'tokenId:', tokenId, ')');
-        const currentBlock = await provider.getBlockNumber();
-        const fromBlock = Math.max(0, currentBlock - 6000000);
-        console.log('  - 블록 범위:', fromBlock, '~', currentBlock);
-        
-        // drawId로 필터링하여 해당 회차의 티켓만 조회 (성능 최적화)
-        const ticketFilter = contract.filters.TicketPurchased(null, drawId);
-        console.log('  - TicketPurchased 이벤트 조회 중 (회차:', drawId, ')...');
-        
-        const ticketEvents = await contract.queryFilter(ticketFilter, fromBlock, 'latest');
-        console.log('  - 회차', drawId, '이벤트:', ticketEvents.length, '개');
-        
-        // 해당 tokenId의 이벤트 찾기
-        let myNumArray: number[] = [];
-        for (const event of ticketEvents) {
-          if (!('args' in event)) continue;
-          const eventTokenId = Number(event.args[2]);
-          if (eventTokenId === tokenId) {
-            const numbers = event.args[3];
-            myNumArray = numbers.map((n: any) => Number(n));
-            console.log('✅ TokenId', tokenId, '의 번호 찾음:', myNumArray);
-            break;
-          }
-        }
-        
-        if (myNumArray.length === 0) {
-          const allTokenIds = ticketEvents.filter((e: any) => 'args' in e).map((e: any) => Number(e.args[2]));
-          console.error('❌ TokenId', tokenId, '를 찾지 못했습니다.');
-          console.error('  - 회차', drawId, '의 TokenId들:', allTokenIds);
-          throw new Error(`TokenId ${tokenId}의 티켓 정보를 찾을 수 없습니다. (회차 ${drawId}에 ${ticketEvents.length}개 티켓)`);
-        }
-        
-        console.log('✅ 내 번호:', myNumArray);
-
         // 매칭 수 계산
-        console.log('4️⃣ 매칭 수 계산 중...');
+        console.log('5️⃣ 매칭 수 계산 중...');
         const matchCount = myNumArray.filter((n: number) => winningNums.includes(n)).length;
         console.log('✅ 매칭 수:', matchCount, '개');
 
