@@ -91,10 +91,35 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         winningNums.sort((a, b) => a - b);
         console.log('✅ 당첨 번호:', winningNums);
 
-        // 내 번호 조회
+        // 내 번호 조회 (TicketPurchased 이벤트에서)
         console.log('3️⃣ 내 번호 조회 중... (tokenId:', tokenId, ')');
-        const myNums = await contract.ticketNumbers(tokenId);
-        const myNumArray = myNums.map((n: any) => Number(n));
+        const currentBlock = await provider.getBlockNumber();
+        const fromBlock = Math.max(0, currentBlock - 2000000);
+        console.log('  - 블록 범위:', fromBlock, '~', currentBlock);
+        
+        const ticketFilter = contract.filters.TicketPurchased(null, drawId);
+        console.log('  - TicketPurchased 이벤트 조회 중...');
+        
+        const ticketEvents = await contract.queryFilter(ticketFilter, fromBlock, 'latest');
+        console.log('  - 찾은 이벤트:', ticketEvents.length, '개');
+        
+        // 해당 tokenId의 이벤트 찾기
+        let myNumArray: number[] = [];
+        for (const event of ticketEvents) {
+          if (!('args' in event)) continue;
+          const eventTokenId = Number(event.args[2]);
+          if (eventTokenId === tokenId) {
+            const numbers = event.args[3];
+            myNumArray = numbers.map((n: any) => Number(n));
+            console.log('✅ TokenId', tokenId, '의 번호 찾음:', myNumArray);
+            break;
+          }
+        }
+        
+        if (myNumArray.length === 0) {
+          throw new Error(`TokenId ${tokenId}의 티켓 정보를 찾을 수 없습니다`);
+        }
+        
         console.log('✅ 내 번호:', myNumArray);
 
         // 매칭 수 계산
@@ -130,9 +155,6 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         // PrizesDistributed 이벤트에서 트랜잭션 해시 조회
         console.log('6️⃣ PrizesDistributed 이벤트 조회 중...');
         const prizeFilter = contract.filters.PrizesDistributed(drawId, tokenId);
-        const currentBlock = await provider.getBlockNumber();
-        const fromBlock = Math.max(0, currentBlock - 2000000);
-        console.log('  - 블록 범위:', fromBlock, '~', currentBlock);
         
         const prizeEvents = await contract.queryFilter(prizeFilter, fromBlock, 'latest');
         console.log('✅ PrizesDistributed 이벤트:', prizeEvents.length, '개');
