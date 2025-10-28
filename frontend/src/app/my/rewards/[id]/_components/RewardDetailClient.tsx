@@ -91,20 +91,20 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         winningNums.sort((a, b) => a - b);
         console.log('✅ 당첨 번호:', winningNums);
 
-        // 내 번호 조회 (TicketPurchased 이벤트에서)
-        console.log('3️⃣ 내 번호 조회 중... (tokenId:', tokenId, ')');
+        // 내 번호 조회 (TicketPurchased 이벤트에서 - drawId로 필터링)
+        console.log('3️⃣ 내 번호 조회 중... (drawId:', drawId, 'tokenId:', tokenId, ')');
         const currentBlock = await provider.getBlockNumber();
-        // 전체 블록에서 조회
-        const fromBlock = 0;
-        console.log('  - 블록 범위: 0 ~', currentBlock);
+        const fromBlock = Math.max(0, currentBlock - 6000000);
+        console.log('  - 블록 범위:', fromBlock, '~', currentBlock);
         
-        const ticketFilter = contract.filters.TicketPurchased();
-        console.log('  - TicketPurchased 이벤트 조회 중 (전체 블록)...');
+        // drawId로 필터링하여 해당 회차의 티켓만 조회 (성능 최적화)
+        const ticketFilter = contract.filters.TicketPurchased(null, drawId);
+        console.log('  - TicketPurchased 이벤트 조회 중 (회차:', drawId, ')...');
         
         const ticketEvents = await contract.queryFilter(ticketFilter, fromBlock, 'latest');
-        console.log('  - 전체 이벤트:', ticketEvents.length, '개');
+        console.log('  - 회차', drawId, '이벤트:', ticketEvents.length, '개');
         
-        // 해당 tokenId의 이벤트 찾기 (중간 로그 제거로 성능 개선)
+        // 해당 tokenId의 이벤트 찾기
         let myNumArray: number[] = [];
         for (const event of ticketEvents) {
           if (!('args' in event)) continue;
@@ -120,8 +120,8 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         if (myNumArray.length === 0) {
           const allTokenIds = ticketEvents.filter((e: any) => 'args' in e).map((e: any) => Number(e.args[2]));
           console.error('❌ TokenId', tokenId, '를 찾지 못했습니다.');
-          console.error('  - 조회된 TokenId:', allTokenIds);
-          throw new Error(`TokenId ${tokenId}의 티켓 정보를 찾을 수 없습니다.`);
+          console.error('  - 회차', drawId, '의 TokenId들:', allTokenIds);
+          throw new Error(`TokenId ${tokenId}의 티켓 정보를 찾을 수 없습니다. (회차 ${drawId}에 ${ticketEvents.length}개 티켓)`);
         }
         
         console.log('✅ 내 번호:', myNumArray);
