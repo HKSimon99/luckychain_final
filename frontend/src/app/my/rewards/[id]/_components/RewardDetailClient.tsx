@@ -134,31 +134,22 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         let grade = '';
         let prizeAmount = 0;
 
-        console.log('5️⃣ 등수 및 상금 조회 중...');
+        console.log('5️⃣ 등수 계산 중...');
         if (matchCount === 6) {
           grade = '1등';
-          const firstPrizeWei = await contract.firstPrize(drawId);
-          prizeAmount = parseFloat(ethers.formatEther(firstPrizeWei));
-          console.log('✅ 1등! 상금:', prizeAmount, 'KAIA');
         } else if (matchCount === 5) {
           grade = '2등';
-          const secondPrizeWei = await contract.secondPrize(drawId);
-          prizeAmount = parseFloat(ethers.formatEther(secondPrizeWei));
-          console.log('✅ 2등! 상금:', prizeAmount, 'KAIA');
         } else if (matchCount === 4) {
           grade = '3등';
-          const thirdPrizeWei = await contract.thirdPrize(drawId);
-          prizeAmount = parseFloat(ethers.formatEther(thirdPrizeWei));
-          console.log('✅ 3등! 상금:', prizeAmount, 'KAIA');
         } else {
           grade = '낙첨';
-          prizeAmount = 0;
-          console.log('❌ 낙첨 (매칭 수:', matchCount, ')');
         }
+        console.log('✅ 등수:', grade);
 
-        // PrizesDistributed 이벤트에서 트랜잭션 해시 조회
+        // PrizesDistributed 이벤트에서 상금 정보 조회
         console.log('6️⃣ PrizesDistributed 이벤트 조회 중...');
-        const prizeFilter = contract.filters.PrizesDistributed(drawId, tokenId);
+        // drawId만 필터링 (tokenId는 indexed 아님)
+        const prizeFilter = contract.filters.PrizesDistributed(drawId);
         
         const prizeEvents = await contract.queryFilter(prizeFilter, fromBlock, 'latest');
         console.log('✅ PrizesDistributed 이벤트:', prizeEvents.length, '개');
@@ -166,7 +157,17 @@ export default function RewardDetailClient({ initialDrawId, initialTokenId }: Re
         let transactionHash = '';
         let receiptDate = '';
 
-        if (prizeEvents.length > 0) {
+        if (prizeEvents.length > 0 && 'args' in prizeEvents[0]) {
+          // args[4] = firstPrize, args[5] = secondPrize, args[6] = thirdPrize
+          if (grade === '1등') {
+            prizeAmount = parseFloat(ethers.formatEther(prizeEvents[0].args[4]));
+          } else if (grade === '2등') {
+            prizeAmount = parseFloat(ethers.formatEther(prizeEvents[0].args[5]));
+          } else if (grade === '3등') {
+            prizeAmount = parseFloat(ethers.formatEther(prizeEvents[0].args[6]));
+          }
+          console.log('✅ 상금:', prizeAmount, 'KAIA');
+
           transactionHash = prizeEvents[0].transactionHash;
           console.log('  - TX Hash:', transactionHash);
           const block = await provider.getBlock(prizeEvents[0].blockNumber);

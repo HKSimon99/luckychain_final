@@ -94,40 +94,36 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
           ticketNumbersMap.set(tokenId, numbers);
         }
 
-        // 당첨자 정보 조회
-        const firstPrizeWei = await contract.firstPrize(drawId);
-        const secondPrizeWei = await contract.secondPrize(drawId);
-        const thirdPrizeWei = await contract.thirdPrize(drawId);
+        // PrizesDistributed 이벤트로 상금 정보 조회
+        const prizeFilter = contract.filters.PrizesDistributed(drawId);
+        const prizeEvents = await contract.queryFilter(prizeFilter, fromBlock, 'latest');
 
-        const firstPrize = parseFloat(ethers.formatEther(firstPrizeWei));
-        const secondPrize = parseFloat(ethers.formatEther(secondPrizeWei));
-        const thirdPrize = parseFloat(ethers.formatEther(thirdPrizeWei));
+        let firstPrize = 0;
+        let secondPrize = 0;
+        let thirdPrize = 0;
+
+        if (prizeEvents.length > 0 && 'args' in prizeEvents[0]) {
+          // args[0] = drawId (indexed)
+          // args[1] = firstWinners
+          // args[2] = secondWinners  
+          // args[3] = thirdWinners
+          // args[4] = firstPrize ← 1등 상금
+          // args[5] = secondPrize ← 2등 상금
+          // args[6] = thirdPrize ← 3등 상금
+          firstPrize = parseFloat(ethers.formatEther(prizeEvents[0].args[4]));
+          secondPrize = parseFloat(ethers.formatEther(prizeEvents[0].args[5]));
+          thirdPrize = parseFloat(ethers.formatEther(prizeEvents[0].args[6]));
+        }
 
         // 총 상금 계산 (1등 + 2등 + 3등)
         const totalPrizeValue = firstPrize + secondPrize + thirdPrize;
         setTotalPrize(totalPrizeValue.toFixed(2));
         setTotalPrizeKRW(Math.floor(totalPrizeValue * kaiaPrice).toLocaleString('ko-KR'));
 
-        // PrizesDistributed 이벤트로 당첨자 조회
-        const prizeFilter = contract.filters.PrizesDistributed(drawId);
-        const prizeEvents = await contract.queryFilter(prizeFilter, fromBlock, 'latest');
-
+        // 모든 티켓 중에서 당첨된 티켓 찾기
         const winnerMap = new Map<string, { tokenIds: number[]; rank: string; prize: number }>();
 
-        for (const event of prizeEvents) {
-          // EventLog 타입 체크
-          if (!('args' in event)) continue;
-          
-          const tokenId = Number(event.args[1]);
-          const winner = event.args[2];
-          const rank = event.args[3];
-
-          // 맵에서 티켓 번호 가져오기
-          const ticketArray = ticketNumbersMap.get(tokenId);
-          if (!ticketArray) {
-            console.warn(`TokenId ${tokenId}의 번호를 찾을 수 없습니다`);
-            continue;
-          }
+        for (const [tokenId, ticketArray] of ticketNumbersMap.entries()) {
           const matchCount = ticketArray.filter((n: number) => numArray.includes(n)).length;
 
           let rankStr = '';
@@ -141,6 +137,9 @@ export default function WinnersClient({ initialDrawId }: WinnersClientProps) {
           } else if (matchCount === 4) {
             rankStr = '3등';
             prizeAmount = thirdPrize;
+          } else {
+            // 낙첨은 제외
+            continue;
           }
 
           if (!winnerMap.has(rankStr)) {
